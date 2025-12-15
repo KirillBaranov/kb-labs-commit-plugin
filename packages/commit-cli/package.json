@@ -1,9 +1,9 @@
 {
-  "name": "@kb-labs/plugin-template-contracts",
+  "name": "@kb-labs/commit-cli",
   "version": "0.1.0",
   "type": "module",
   "private": true,
-  "description": "Public contracts package for the KB Labs plugin template. Provides typed guarantees about artifacts, commands, workflows, and APIs.",
+  "description": "CLI commands and manifest for KB Labs Commit plugin - AI-powered commit generation.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -11,15 +11,16 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
-    "./contract": {
-      "import": "./dist/contract.js",
-      "types": "./dist/contract.d.ts"
+    "./plugin-manifest": {
+      "import": "./dist/manifest.v2.js",
+      "types": "./dist/manifest.v2.d.ts"
     },
-    "./schema": {
-      "import": "./dist/schema.js",
-      "types": "./dist/schema.d.ts"
-    },
+    "./cli": "./dist/cli/index.js",
+    "./lifecycle": "./dist/lifecycle/index.js",
     "./dist/*": "./dist/*"
+  },
+  "kb": {
+    "manifest": "./dist/manifest.v2.js"
   },
   "files": [
     "dist",
@@ -28,7 +29,7 @@
   ],
   "sideEffects": false,
   "scripts": {
-    "pretype-check": "pnpm --filter @kb-labs/plugin-template-contracts build",
+    "pretype-check": "pnpm --filter @kb-labs/commit-cli build",
     "clean": "rimraf dist",
     "build": "tsup --config tsup.config.ts",
     "dev": "tsup --config tsup.config.ts --watch",
@@ -39,12 +40,13 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "zod": "^3.23.8"
+    "@kb-labs/commit-contracts": "workspace:*",
+    "@kb-labs/commit-core": "workspace:*",
+    "@kb-labs/sdk": "link:../../../kb-labs-sdk/packages/sdk"
   },
   "devDependencies": {
     "@kb-labs/devkit": "link:../../../kb-labs-devkit",
     "@types/node": "^24.3.3",
-    "eslint": "^9",
     "rimraf": "^6.0.1",
     "tsup": "^8.5.0",
     "typescript": "^5.6.3",

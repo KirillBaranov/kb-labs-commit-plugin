@@ -1,8 +1,8 @@
 {
-  "name": "@kb-labs/plugin-template",
+  "name": "@kb-labs/commit-plugin",
   "version": "0.1.0",
   "private": true,
-  "description": "Reference plugin template for the KB Labs ecosystem with devkit-powered tooling.",
+  "description": "AI-powered commit generation plugin for KB Labs ecosystem.",
   "type": "module",
   "author": {
     "name": "Kirill Baranov",
@@ -11,14 +11,13 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kirill-baranov/kb-labs-plugin-template.git"
+    "url": "https://github.com/kirill-baranov/kb-labs-commit-plugin.git"
   },
   "bugs": {
-    "url": "https://github.com/kirill-baranov/kb-labs-plugin-template/issues"
+    "url": "https://github.com/kirill-baranov/kb-labs-commit-plugin/issues"
   },
-  "homepage": "https://github.com/kirill-baranov/kb-labs-plugin-template#readme",
+  "homepage": "https://github.com/kirill-baranov/kb-labs-commit-plugin#readme",
   "workspaces": [
-    "apps/*",
     "packages/*"
   ],
   "scripts": {

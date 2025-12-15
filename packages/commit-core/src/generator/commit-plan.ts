@@ -19,6 +19,11 @@ import {
 } from './llm-prompt';
 import { generateHeuristicPlan } from './heuristics';
 import { minimatch } from 'minimatch';
+import {
+  detectSecretFiles,
+  detectSecretsInDiffs,
+  formatSecretsWarning,
+} from '../analyzer/secrets-detector';
 
 /** Confidence threshold - below this we escalate to Phase 2 with diff */
 const CONFIDENCE_THRESHOLD = 0.7;
@@ -61,13 +66,27 @@ export async function generateCommitPlan(options: GenerateOptions): Promise<Comm
     return createEmptyPlan(cwd, gitStatus);
   }
 
-  // 3. Get file summaries (diff stats)
+  // 3. 🔒 Security: Check for secret files early - ABORT if found!
+  const secretFiles = detectSecretFiles(allFiles);
+
+  if (secretFiles.length > 0) {
+    const warning = formatSecretsWarning(secretFiles);
+    await logger.error('🚨 SECRETS DETECTED - ABORTING COMMIT GENERATION', new Error('Secrets detected'), {
+      secretFiles,
+    });
+    console.error('\n' + warning + '\n');
+
+    // ABORT - do not create any commits with secrets
+    throw new Error(`Secrets detected in ${secretFiles.length} file(s). Cannot proceed with commit generation. Add these files to .gitignore or remove secrets before committing.`);
+  }
+
+  // 4. Get file summaries (diff stats)
   const summaries = await getFileSummaries(cwd, allFiles);
 
-  // 4. Get recent commits for style reference
+  // 5. Get recent commits for style reference
   const recentCommits = options.recentCommits ?? await getRecentCommits(cwd, 10);
 
-  // 5. Generate plan using LLM (two-phase) or heuristics
+  // 6. Generate plan using LLM (two-phase) or heuristics
   let commits: CommitGroup[];
   let llmUsed = false;
   let tokensUsed: number | undefined;
@@ -108,6 +127,25 @@ export async function generateCommitPlan(options: GenerateOptions): Promise<Comm
           : summaries.map((s) => s.path);
 
         const diffs = await getFileDiffs(cwd, filesToDiff);
+
+        // 🔒 Security: Check for secrets in diffs before sending to LLM
+        const secretDiffs = detectSecretsInDiffs(diffs);
+        const secretFilesInDiff = Array.from(secretDiffs.keys());
+
+        if (secretFilesInDiff.length > 0) {
+          // Found secrets in diff content - ABORT COMPLETELY
+          const warning = formatSecretsWarning(secretFilesInDiff);
+          await logger.error('🚨 SECRETS DETECTED IN DIFF CONTENT - ABORTING', new Error('Secrets in diff'), {
+            secretFiles: secretFilesInDiff,
+          });
+          onProgress?.('🚨 Secrets detected - ABORTING');
+
+          // Show error to user
+          console.error('\n' + warning + '\n');
+
+          // ABORT - do not proceed
+          throw new Error(`Secrets detected in ${secretFilesInDiff.length} file(s) diff content. Cannot proceed with commit generation. Remove secrets before committing.`);
+        }
 
         if (diffs.size > 0) {
           await logger.debug('Re-analyzing with diff context (Phase 2)', {

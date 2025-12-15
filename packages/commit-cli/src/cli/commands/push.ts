@@ -46,6 +46,25 @@ export const pushCommand = defineCommand({
 
     if (flags.json) {
       ctx.ui?.json?.(output);
+    } else if (!result.success) {
+      // Show error details
+      ctx.ui?.error?.('Push Failed', {
+        summary: {
+          'Remote': result.remote || 'unknown',
+          'Branch': result.branch || 'unknown',
+          'Error': result.error || 'Unknown error',
+        },
+      });
+    } else if (result.commitsPushed > 0) {
+      // Show success details
+      ctx.ui?.success?.('Push Successful', {
+        summary: {
+          'Commits pushed': result.commitsPushed,
+          'Remote': result.remote || 'origin',
+          'Branch': result.branch || 'main',
+          'Status': '✅ Up to date',
+        },
+      });
     }
 
     return {

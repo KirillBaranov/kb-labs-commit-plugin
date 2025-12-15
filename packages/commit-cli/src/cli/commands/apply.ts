@@ -83,13 +83,41 @@ export const applyCommand = defineCommand({
       ctx.ui?.json?.(output);
     } else {
       if (result.success) {
-        for (const commit of result.appliedCommits) {
-          ctx.ui?.info?.(`  ${commit.sha.substring(0, 7)} ${commit.message}`);
+        // Build commits section
+        const commitsItems = result.appliedCommits.map((commit) => {
+          return `${commit.sha.substring(0, 7)} ${commit.message}`;
+        });
+
+        const sections: Array<{ header?: string; items: string[] }> = [];
+
+        if (commitsItems.length > 0) {
+          sections.push({
+            header: 'Applied Commits',
+            items: commitsItems,
+          });
         }
+
+        const summary: Record<string, string | number> = {
+          'Total commits': result.appliedCommits.length,
+          'Status': '✅ Success',
+        };
+
+        ctx.ui?.success?.('Commits Applied', {
+          summary,
+          sections,
+        });
       } else {
-        for (const error of result.errors) {
-          ctx.ui?.error?.(`  ${error}`);
-        }
+        const errorItems = result.errors.map((error) => `❌ ${error}`);
+
+        ctx.ui?.error?.('Failed to Apply Commits', {
+          summary: {
+            'Total errors': result.errors.length,
+          },
+          sections: [{
+            header: 'Errors',
+            items: errorItems,
+          }],
+        });
       }
     }
 

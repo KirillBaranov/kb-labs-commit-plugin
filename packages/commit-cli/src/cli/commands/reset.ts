@@ -36,7 +36,12 @@ export const resetCommand = defineCommand({
     // Clear plan
     await clearPlan(cwd);
 
-    ctx.ui?.success?.('Commit plan cleared.');
+    ctx.ui?.success?.('Plan Cleared', {
+      summary: {
+        'Status': '✅ Cleared successfully',
+        'Action': 'Run `kb commit:generate` to create a new plan',
+      },
+    });
 
     return {
       ok: true,

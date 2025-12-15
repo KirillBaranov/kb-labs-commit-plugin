@@ -36,37 +36,50 @@ export const openCommand = defineCommand({
       if (!plan) {
         ctx.ui?.info?.('No commit plan found. Run `kb commit:generate` to create one.');
       } else {
-        ctx.ui?.success?.(`Commit plan: ${planPath}`);
-        ctx.ui?.info?.(`Created: ${plan.createdAt}`);
-        ctx.ui?.info?.(`Files: ${plan.metadata.totalFiles}`);
-        ctx.ui?.info?.(`Commits: ${plan.metadata.totalCommits}`);
-        ctx.ui?.info?.('');
+        // Build commits section
+        const commitsItems = plan.commits.map((commit, i) => {
+          const message = formatCommitMessage(commit);
+          const breaking = commit.breaking ? ' ⚠️  BREAKING' : '';
+          return `${i + 1}. ${message} [${commit.files.length} file(s)]${breaking}`;
+        });
 
-        // Show commits
-        for (let i = 0; i < plan.commits.length; i++) {
-          const commit = plan.commits[i];
-          if (commit) {
-            const message = formatCommitMessage(commit);
-            ctx.ui?.info?.(`${i + 1}. ${message}`);
-            ctx.ui?.info?.(`   Files: ${commit.files.join(', ')}`);
-            ctx.ui?.info?.(`   Release hint: ${commit.releaseHint}`);
-            if (commit.breaking) {
-              ctx.ui?.info?.('   BREAKING CHANGE');
-            }
-            ctx.ui?.info?.('');
-          }
+        // Build git status section
+        const status = plan.gitStatus;
+        const statusItems = [
+          `Staged: ${status.staged.length} file(s)`,
+          `Unstaged: ${status.unstaged.length} file(s)`,
+          `Untracked: ${status.untracked.length} file(s)`,
+        ];
+
+        const sections: Array<{ header?: string; items: string[] }> = [];
+
+        sections.push({
+          header: 'Commits',
+          items: commitsItems,
+        });
+
+        sections.push({
+          header: 'Git Status (at generation)',
+          items: statusItems,
+        });
+
+        const summary: Record<string, string | number> = {
+          'Plan path': planPath,
+          'Created': plan.createdAt,
+          'Total files': plan.metadata.totalFiles,
+          'Total commits': plan.metadata.totalCommits,
+        };
+
+        if (plan.metadata.llmUsed) {
+          summary['Generator'] = plan.metadata.escalated ? 'LLM (Phase 2)' : 'LLM (Phase 1)';
+        } else {
+          summary['Generator'] = 'Heuristics';
         }
 
-        // Show git status at generation time
-        const status = plan.gitStatus;
-        const stagedCount = status.staged.length;
-        const unstagedCount = status.unstaged.length;
-        const untrackedCount = status.untracked.length;
-
-        ctx.ui?.info?.('Git status at generation:');
-        ctx.ui?.info?.(`  Staged: ${stagedCount} file(s)`);
-        ctx.ui?.info?.(`  Unstaged: ${unstagedCount} file(s)`);
-        ctx.ui?.info?.(`  Untracked: ${untrackedCount} file(s)`);
+        ctx.ui?.success?.('Current Commit Plan', {
+          summary,
+          sections,
+        });
       }
     }
 

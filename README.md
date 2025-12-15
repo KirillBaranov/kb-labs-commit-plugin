@@ -1,342 +1,537 @@
-# KB Labs Plugin Template
+# KB Labs Commit Plugin
 
-> **Gold standard reference template** for building production-ready KB Labs plugins with CLI, REST, and Studio surfaces.
+> **AI-powered commit generation for modern development workflows.** Transform your git changes into meaningful, atomic commits with professional commit messages automatically.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Node.js](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
-[![pnpm](https://img.shields.io/badge/pnpm-9+-orange.svg)](https://pnpm.io/)
-[![Documentation](https://img.shields.io/badge/docs-7.7k_lines-blue.svg)](./docs)
+[![Node.js](https://img.shields.io/badge/Node.js-18.18.0+-green.svg)](https://nodejs.org/)
+[![KB Labs Platform](https://img.shields.io/badge/KB_Labs-Platform-blue.svg)](https://github.com/kb-labs)
 
-**What makes this template special:**
-- ✅ **7,700+ lines** of comprehensive documentation
-- ✅ **100% canonical patterns** (no legacy code)
-- ✅ **Production-ready examples** (validation, testing, contracts, multi-tenancy)
-- ✅ **Complete error handling** with 8 custom error classes
-- ✅ **KB Labs standard structure** (cli, rest, studio, lifecycle, core, utils)
+## Overview
 
-## 🚀 Quick start
+KB Labs Commit Plugin is an intelligent commit generator that analyzes your code changes and creates atomic, well-structured commits with professional commit messages following Conventional Commits specification. It's designed for developers who want to maintain clean git history without manual commit crafting.
+
+**Key benefits:**
+- ✅ **AI-powered commit generation** - Analyzes diffs and creates logical commit groupings
+- ✅ **Conventional Commits** - Professional messages with proper types and scopes
+- ✅ **Atomic commits** - Groups related changes into focused commits
+- ✅ **Heuristic fallback** - Works even when LLM is unavailable
+- ✅ **Monorepo support** - Handles complex nested repository structures
+
+## Quick Start
+
+### Installation
+
+Commit Plugin is part of the KB Labs platform and runs in the KB Labs environment:
 
 ```bash
-# Clone and install
-git clone https://github.com/kb-labs/kb-labs-plugin-template.git
-cd kb-labs-plugin-template
-pnpm install
+# Commit Plugin is integrated into KB Labs
+# No separate installation needed - available via kb CLI
 
-# Build the plugin
-pnpm --filter @kb-labs/plugin-template-core run build
+# Make sure you're in a KB Labs workspace
+cd /path/to/kb-labs
 
-# Run hello command
-kb template:hello --name Developer
-# Output: Hello, Developer!
+# Plugin commands available immediately
+pnpm kb commit --help
 ```
 
-## 📖 Documentation (7,700+ lines!)
+### Setup
 
-### Getting started
-- 📘 [Getting Started](./docs/getting-started.md) - Setup, build, and first steps
-- 🏗️ [Architecture](./docs/architecture.md) - KB Labs folder structure and patterns
-- 📦 [Naming Convention](./docs/naming-convention.md) - The Pyramid Rule (mandatory!)
-- 🔄 [Refactoring Guide](./docs/REFACTORING.md) - Migration from old DDD structure
+Initialize the commit workspace in your project:
 
-### Surface guides
-- 🖥️ [CLI Guide](./docs/cli-guide.md) - Adding CLI commands with `defineCommand`
-- 🌐 [REST Guide](./docs/rest-guide.md) - Adding REST handlers with Zod validation
-- 🎨 [Studio Guide](./docs/studio-guide.md) - Creating React widgets for KB Labs UI
+```bash
+# Create .kb/commit/ directory structure
+pnpm kb plugins setup @kb-labs/commit
+```
 
-### Comprehensive examples (2,500+ lines)
-- ✅ [Validation Examples](./docs/examples/validation-examples.md) - Zod schemas, custom validation, type inference
-- 🧪 [Test Examples](./docs/examples/test-examples.md) - CLI, REST, widget, and integration testing
-- 🔐 [Contracts Examples](./docs/examples/contracts-examples.md) - Type-safe IDs and hierarchical contracts
-- 🏢 [Multi-Tenancy Examples](./docs/examples/multi-tenancy-examples.md) - SaaS patterns, rate limiting, quotas
+This creates:
+- `.kb/commit/current/` - Current commit plan and artifacts
+- `.kb/commit/history/` - Historical commit plans
+- `.kb/commit/.gitignore` - Prevents accidental commits
+- `.kb/commit/README.md` - Workspace documentation
 
-### Folder-specific READMEs (2,000+ lines)
-- [cli/README.md](./packages/plugin-template-core/src/cli/README.md) - CLI patterns and best practices (324 lines)
-- [rest/README.md](./packages/plugin-template-core/src/rest/README.md) - REST handlers with Zod (358 lines)
-- [studio/README.md](./packages/plugin-template-core/src/studio/README.md) - React widgets and layouts (443 lines)
-- [lifecycle/README.md](./packages/plugin-template-core/src/lifecycle/README.md) - Setup, destroy, upgrade hooks (333 lines)
-- [core/README.md](./packages/plugin-template-core/src/core/README.md) - Pure business logic (240 lines)
-- [utils/README.md](./packages/plugin-template-core/src/utils/README.md) - Utilities and error handling (348 lines)
+### First Commit
 
-## 🎯 What you get
+```bash
+# 1. Generate commit plan from your changes
+pnpm kb commit:generate
 
-### KB Labs standard structure
+# 2. Review the generated plan
+pnpm kb commit:open
+
+# 3. Apply the commits
+pnpm kb commit:apply
+```
+
+Or use the all-in-one command:
+
+```bash
+# Generate + review + apply in one step
+pnpm kb commit
+```
+
+That's it! Commit Plugin will:
+1. Analyze your git changes
+2. Group related files into logical commits
+3. Generate professional commit messages
+4. Create atomic commits with proper structure
+
+## Why Commit Plugin?
+
+### Before Commit Plugin ❌
+```bash
+# Manual, time-consuming process
+git status
+# ... look at 50+ changed files
+git add file1.ts file2.ts
+# ... try to remember what changes belong together
+git commit -m "update stuff"
+# ... repeat for each logical change
+# ... end up with vague commit messages
+```
+
+**Problems:**
+- 🔴 Hard to group related changes
+- 🔴 Writing commit messages takes time
+- 🔴 Easy to create unfocused commits
+- 🔴 Inconsistent commit message format
+- 🔴 Difficult to maintain clean history
+
+### With Commit Plugin ✅
+```bash
+pnpm kb commit
+```
+
+**Benefits:**
+- ✅ Automatic change grouping
+- ✅ Professional commit messages
+- ✅ Atomic, focused commits
+- ✅ Conventional Commits compliance
+- ✅ Clean, reviewable git history
+
+## Features
+
+### 🎯 Intelligent Commit Generation
+
+**AI-powered analysis:**
+- Analyzes file diffs to understand changes
+- Groups related changes into logical commits
+- Generates descriptive, professional commit messages
+- Follows Conventional Commits specification
+
+**Two-phase generation:**
+- **Phase 1** - Quick analysis with file summaries
+- **Phase 2** - Deep analysis with full diffs (if needed)
+- **Heuristic fallback** - Groups by file type when LLM fails
+
+```bash
+# Let AI analyze and group your changes
+pnpm kb commit:generate
+
+# Scope to specific package
+pnpm kb commit:generate --scope "@kb-labs/core"
+
+# Use specific scope name for commit messages
+pnpm kb commit:generate --scope-name "my-feature"
+```
+
+### 📝 Conventional Commits
+
+All commits follow [Conventional Commits](https://www.conventionalcommits.org/) specification:
+
+**Commit types:**
+- `feat:` - New features
+- `fix:` - Bug fixes
+- `refactor:` - Code refactoring
+- `chore:` - Maintenance tasks
+- `docs:` - Documentation updates
+- `test:` - Test additions/updates
+- `build:` - Build system changes
+- `ci:` - CI/CD changes
+- `perf:` - Performance improvements
+
+**Example commits:**
+```
+feat(core): add async logging API
+fix(api): resolve race condition in concurrent writes
+refactor(utils): extract common validation logic
+chore(deps): update dependencies to latest versions
+docs(readme): add installation instructions
+test(core): add unit tests for logger
+```
+
+### 🎨 Commit Grouping Strategies
+
+**Smart grouping rules:**
+- Groups files by logical change, not by file type
+- For initial setup: groups by package or functional area
+- Scales commit count with file count:
+  - 3-8 commits for <50 files
+  - 5-12 commits for 50-150 files
+  - 10-20 commits for 150+ files
+
+**Heuristic fallback:**
+When LLM fails, uses file-based grouping:
+- Dependencies (`package.json`, `pnpm-lock.yaml`)
+- Configurations (`tsconfig.json`, `tsup.config.ts`)
+- Documentation (`.md` files)
+- Tests (`.test.ts`, `.spec.ts`)
+
+### 🔄 Three-Stage Workflow
+
+**1. Generate** - Create commit plan
+```bash
+pnpm kb commit:generate
+# Output: .kb/commit/current/plan.json
+```
+
+**2. Review** - Inspect the plan
+```bash
+pnpm kb commit:open
+# Opens plan in your editor
+```
+
+**3. Apply** - Create the commits
+```bash
+pnpm kb commit:apply
+# Executes git commits
+```
+
+### 🎯 Scope Support
+
+**Nested repository detection:**
+- Automatically detects git submodules
+- Works with monorepo packages
+- Supports wildcard patterns
+
+```bash
+# Scope to specific package
+pnpm kb commit:generate --scope "@kb-labs/commit-plugin"
+
+# Scope to directory
+pnpm kb commit:generate --scope "packages/core"
+
+# Scope with wildcard
+pnpm kb commit:generate --scope "packages/*/src"
+```
+
+### 🛡️ Retry Mechanism
+
+**Automatic LLM retry:**
+- Up to 2 retry attempts on parse errors
+- Exponential backoff (1s, 2s delays)
+- Falls back to heuristics if all retries fail
+- Detailed error logging
+
+### 📊 Commit Reports
+
+**Detailed execution reports:**
+```bash
+# View generated plan
+pnpm kb commit:open
+
+# Check what was created
+cat .kb/commit/current/plan.json
+```
+
+**Plan structure:**
+```json
+{
+  "commits": [
+    {
+      "message": "feat(core): add new feature",
+      "files": ["src/feature.ts", "src/types.ts"],
+      "description": "Implements async logging with batching"
+    }
+  ],
+  "metadata": {
+    "generator": "llm",
+    "confidence": 0.85,
+    "totalFiles": 15,
+    "totalCommits": 4
+  }
+}
+```
+
+## Advanced Usage
+
+### Monorepo Support
+
+Commit Plugin natively supports complex monorepo structures:
+
+```bash
+# Commit changes in specific workspace
+pnpm kb commit:generate --scope "@kb-labs/core"
+
+# Nested monorepo (submodule)
+pnpm kb commit:generate --scope "@kb-labs/commit-plugin"
+
+# Wildcard patterns
+pnpm kb commit:generate --scope "packages/core-*"
+```
+
+**Supported structures:**
+- Flat monorepos (`packages/*`)
+- Nested umbrellas (`kb-*/packages/**`)
+- Git submodules (nested repositories)
+- Mixed hierarchies (any structure)
+
+### Configuration
+
+Create `kb.config.json` in your workspace:
+
+```json
+{
+  "commit": {
+    "scope": {
+      "default": "kb-labs-commit-plugin"
+    },
+    "llm": {
+      "maxRetries": 2,
+      "temperature": 0.3,
+      "maxTokensPhase1": 2000,
+      "maxTokensPhase2": 6000
+    },
+    "heuristics": {
+      "enabled": true,
+      "minCommits": 3,
+      "maxCommits": 8
+    }
+  }
+}
+```
+
+### CI/CD Integration
+
+**GitHub Actions:**
+```yaml
+name: Auto Commit
+on:
+  workflow_dispatch:
+
+jobs:
+  commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+      - uses: actions/setup-node@v4
+
+      - run: pnpm install
+      - run: pnpm kb commit:generate --scope "@my-org/my-package"
+      - run: pnpm kb commit:apply
+      - run: git push
+```
+
+**GitLab CI:**
+```yaml
+auto-commit:
+  script:
+    - pnpm install
+    - pnpm kb commit:generate
+    - pnpm kb commit:apply
+    - git push
+  only:
+    - main
+  when: manual
+```
+
+## Command Reference
+
+### Core Commands
+
+| Command | Description |
+|---------|-------------|
+| `pnpm kb commit` | Full workflow (generate + review + apply) |
+| `pnpm kb commit:generate` | Generate commit plan from changes |
+| `pnpm kb commit:open` | Open plan in editor for review |
+| `pnpm kb commit:apply` | Execute commits from plan |
+| `pnpm kb commit:push` | Push commits to remote |
+
+### Common Flags
+
+| Flag | Description |
+|------|-------------|
+| `--scope <pattern>` | Filter to specific packages/paths |
+| `--scope-name <name>` | Override scope name in commit messages |
+| `--dry-run` | Preview without creating commits |
+| `--skip-llm` | Use heuristics only (skip AI) |
+
+## Use Cases
+
+### 1. Regular Development
+```bash
+# Make your changes
+# Then create commits
+pnpm kb commit
+```
+
+### 2. Large Refactoring
+```bash
+# Generate commits for 100+ files
+pnpm kb commit:generate
+# Review the plan
+pnpm kb commit:open
+# Apply if looks good
+pnpm kb commit:apply
+```
+
+### 3. Initial Project Setup
+```bash
+# Generate commits for new project files
+pnpm kb commit:generate --scope "@my-org/new-project"
+```
+
+### 4. Scoped Changes
+```bash
+# Only commit changes in specific package
+pnpm kb commit:generate --scope "packages/core"
+```
+
+## FAQ
+
+### Q: Do I need to install Commit Plugin separately?
+
+**A:** No! Commit Plugin is part of the KB Labs platform and runs within the KB Labs environment. It's designed to work exclusively in KB Labs workspaces, not as a standalone package.
+
+### Q: Can I install this via npm/pnpm directly?
+
+**A:** Commit Plugin is not designed for standalone use. It's integrated into the KB Labs ecosystem and requires:
+- KB Labs CLI runtime
+- KB Labs workspace structure
+- KB Labs plugin system
+
+**To use it:**
+```bash
+# From your KB Labs workspace root
+pnpm kb commit --help
+```
+
+### Q: Do I need to run setup before first use?
+
+**A:** Yes, run setup once per project to create the `.kb/commit/` workspace:
+```bash
+pnpm kb plugins setup @kb-labs/commit
+```
+This creates the directory structure for plans and history. Setup is automatic and safe to run multiple times.
+
+### Q: Can I use Commit Plugin outside KB Labs?
+
+**A:** No. Commit Plugin is tightly integrated with KB Labs:
+- Uses KB Labs plugin runtime (`runtime.state`, `runtime.logger`)
+- Relies on KB Labs workspace structure
+- Requires KB Labs CLI commands registry
+- Designed for KB Labs monorepo architecture
+
+Think of it like a VS Code extension - it only works within VS Code, not as a standalone tool.
+
+### Q: What happens if LLM fails to generate commits?
+
+**A:** Commit Plugin automatically falls back to heuristic-based grouping:
+- Groups files by type (dependencies, configs, docs, tests)
+- Creates focused commits with proper types
+- Guarantees at least 3-4 commits for better granularity
+
+### Q: Can I customize commit message format?
+
+**A:** Commit messages follow Conventional Commits specification. You can customize scope names:
+```bash
+pnpm kb commit:generate --scope-name "my-feature"
+```
+
+### Q: How does the plugin group files?
+
+**A:** It uses two strategies:
+1. **LLM-based** (primary): Analyzes diffs to understand logical changes
+2. **Heuristic** (fallback): Groups by file type and purpose
+
+The LLM tries to answer: "Would a developer make these changes in separate commits?"
+
+### Q: Can I scope commits to specific packages?
+
+**A:** Yes! Use the `--scope` flag:
+```bash
+pnpm kb commit:generate --scope "@kb-labs/core"
+```
+
+### Q: Does it work with git submodules?
+
+**A:** Yes! Commit Plugin automatically detects nested git repositories:
+```bash
+pnpm kb commit:generate --scope "@kb-labs/commit-plugin"
+```
+It will run git commands inside the submodule.
+
+### Q: How many commits will it generate?
+
+**A:** It scales with file count:
+- <50 files → 3-8 commits
+- 50-150 files → 5-12 commits
+- 150+ files → 10-20 commits
+
+You can review the plan before applying.
+
+### Q: Can I edit the plan before applying?
+
+**A:** Yes! Open the plan:
+```bash
+pnpm kb commit:open
+```
+Edit `.kb/commit/current/plan.json`, then apply:
+```bash
+pnpm kb commit:apply
+```
+
+### Q: What if I don't like the generated commits?
+
+**A:** Don't apply them! The plan is just a JSON file. You can:
+- Regenerate with different scope
+- Edit the plan manually
+- Skip and commit manually
+
+## Architecture
+
+Commit Plugin follows KB Labs standard structure:
 
 ```
-packages/plugin-template-core/src/
-├── cli/              # CLI commands (defineCommand pattern)
-│   ├── commands/     # Command implementations
-│   ├── utils.ts      # getCommandId helper
-│   └── README.md     # 324 lines of CLI patterns
-├── rest/             # REST API handlers
-│   ├── handlers/     # definePluginHandler implementations
-│   ├── schemas/      # Zod request/response schemas
-│   └── README.md     # 358 lines of REST patterns
-├── studio/           # Studio React components
-│   ├── widgets/      # Widget implementations
-│   └── README.md     # 443 lines of widget patterns
-├── lifecycle/        # Plugin lifecycle hooks
-│   ├── setup.ts      # Installation handler
-│   └── README.md     # 333 lines of lifecycle patterns
-├── core/             # Pure business logic
-│   ├── greeting.ts   # Domain entities
-│   └── README.md     # 240 lines of core patterns
+packages/commit-core/src/
+├── cli/              # CLI commands
+│   └── commands/     # commit:generate, commit:apply, etc.
+├── generator/        # Commit plan generation
+│   ├── commit-plan.ts      # Main generation logic
+│   ├── llm-prompt.ts       # LLM prompts
+│   └── heuristics.ts       # Fallback grouping
+├── analyzer/         # Git analysis
+│   ├── git-status.ts       # Git status + nested repo detection
+│   └── scope-resolver.ts   # Package scope resolution
+├── executor/         # Commit execution
+│   └── commit-executor.ts  # Git commit operations
 └── utils/            # Shared utilities
-    ├── errors.ts     # 8 custom error classes (401 lines!)
-    ├── constants.ts  # Shared constants
-    └── README.md     # 348 lines of utility patterns
+    ├── errors.ts           # Custom error classes
+    └── constants.ts        # Shared constants
 ```
 
-### Comprehensive error handling
+## Support & Resources
 
-```typescript
-import {
-  ValidationError,      // Input validation errors
-  NotFoundError,        // Resource not found
-  BusinessRuleError,    // Business logic violations
-  PermissionError,      // Access denied
-  QuotaExceededError,   // Rate limits exceeded
-  ConfigurationError,   // Invalid configuration
-  formatErrorForLogging,  // For ctx.logger
-  formatErrorForUser      // For user-facing messages
-} from './utils/errors.js';
-```
+- **Documentation**: [Full docs →](./docs/)
+- **Issues**: [Report bugs →](https://github.com/kb-labs/kb-labs-commit-plugin/issues)
+- **Discussions**: [Ask questions →](https://github.com/kb-labs/kb-labs/discussions)
+- **KB Labs Platform**: [Main repository →](https://github.com/kb-labs/kb-labs)
 
-### Production-ready examples
 
-**Validation with Zod:**
-```typescript
-const UserSchema = z.object({
-  email: z.string().email('Invalid email'),
-  age: z.number().int().min(18, 'Must be 18+')
-});
+## License
 
-export const handleCreateUser = definePluginHandler({
-  schema: { input: UserSchema, output: UserResponseSchema },
-  async handle(input, ctx) {
-    // Input is already validated!
-    const user = await createUser(input);
-    return { userId: user.id };
-  }
-});
-```
+KB Public License v1.1 - see [LICENSE](LICENSE) for details.
 
-**Type-safe contracts:**
-```typescript
-export const CommandIds = {
-  HELLO: 'template:hello',
-  CREATE: 'template:create'
-} as const;
+This is open source software with some restrictions on:
+- Offering as a hosted service (SaaS/PaaS)
+- Creating competing platform products
 
-// Use everywhere - autocomplete + type safety
-export const run = defineCommand({
-  name: CommandIds.HELLO,  // ✅ No typos!
-  //...
-});
-```
+For commercial licensing inquiries: contact@kblabs.dev
 
-**Multi-tenancy:**
-```typescript
-import { TenantRateLimiter } from '@kb-labs/tenant';
-
-const limiter = new TenantRateLimiter(broker);
-
-const result = await limiter.checkLimit(tenantId, 'api');
-if (!result.allowed) {
-  throw new QuotaExceededError('api', result.limit!, result.current!);
-}
-```
-
-## 🧱 Architecture highlights
-
-### Canonical patterns (100% compliant)
-
-**CLI commands:**
-```typescript
-export const run = defineCommand({
-  name: getCommandId('template:hello'),
-  flags: {
-    name: { type: 'string', default: 'World' }
-  },
-  async handler(ctx, argv, flags) {
-    ctx.logger?.info('Command started', { name: flags.name });
-    ctx.output?.write(`Hello, ${flags.name}!\n`);
-    return { ok: true, message: `Hello, ${flags.name}!`, target: flags.name };
-  }
-});
-```
-
-**REST handlers:**
-```typescript
-export const handleHello = definePluginHandler({
-  schema: {
-    input: HelloRequestSchema,
-    output: HelloResponseSchema
-  },
-  async handle(input, ctx) {
-    ctx.output?.info('REST handler started', { name: input.name });
-    const greeting = createGreeting(input.name);
-    return { message: greeting.message, target: greeting.target };
-  }
-});
-```
-
-**Studio widgets:**
-```typescript
-export function HelloWidget({ data, loading, error }: HelloWidgetProps) {
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error.message}</div>;
-  if (!data) return <div>No data</div>;
-
-  return (
-    <div className="widget-container">
-      <h2>Hello from Plugin Template</h2>
-      <p>{data.message}</p>
-    </div>
-  );
-}
-```
-
-### No legacy code!
-
-- ❌ No `createConsoleLogger` (deprecated)
-- ❌ No DDD layers (domain/application/infrastructure)
-- ❌ No path aliases (@app/*, @domain/*)
-- ✅ 100% `ctx.logger` everywhere
-- ✅ Pure functions in `core/`
-- ✅ KB Labs standard folders
-
-## 📦 Repository layout
-
-```
-kb-labs-plugin-template/
-├── packages/
-│   ├── plugin-template-core/    # Main plugin package
-│   │   ├── src/
-│   │   │   ├── cli/            # CLI commands (324 line README)
-│   │   │   ├── rest/           # REST handlers (358 line README)
-│   │   │   ├── studio/         # React widgets (443 line README)
-│   │   │   ├── lifecycle/      # Plugin lifecycle (333 line README)
-│   │   │   ├── core/           # Business logic (240 line README)
-│   │   │   └── utils/          # Utilities + errors (348 line README)
-│   │   ├── tests/              # Vitest tests
-│   │   └── package.json        # @kb-labs/plugin-template-core
-│   └── contracts/              # Type-safe contracts
-├── docs/
-│   ├── getting-started.md      # Setup guide
-│   ├── architecture.md         # KB Labs structure
-│   ├── cli-guide.md            # CLI patterns (1,395 lines of guides)
-│   ├── rest-guide.md
-│   ├── studio-guide.md
-│   ├── examples/               # 2,500+ lines of examples
-│   │   ├── validation-examples.md
-│   │   ├── test-examples.md
-│   │   ├── contracts-examples.md
-│   │   └── multi-tenancy-examples.md
-│   └── adr/
-│       └── 0009-flatten-plugin-structure.md
-└── scripts/                    # Sandbox scripts
-```
-
-## 🧪 Testing
-
-```bash
-# Run all tests
-pnpm --filter @kb-labs/plugin-template-core run test
-
-# Run with coverage
-pnpm test -- --coverage
-
-# Watch mode
-pnpm run test:watch
-```
-
-**Test examples included:**
-- ✅ CLI command tests (mocking context, validation)
-- ✅ REST handler tests (Zod validation, dependencies)
-- ✅ Widget tests (React Testing Library, states)
-- ✅ Core logic tests (pure functions, edge cases)
-- ✅ Integration tests (full flows)
-
-See [Test Examples](./docs/examples/test-examples.md) for comprehensive testing patterns.
-
-## 🔧 Scripts
-
-| Script | Description |
-|--------|-------------|
-| `pnpm build` | Build all packages |
-| `pnpm test` | Run test suites |
-| `pnpm lint` | Lint codebase |
-| `pnpm type-check` | TypeScript validation |
-| `pnpm --filter @kb-labs/plugin-template-core build` | Build core package |
-
-## 🎓 Learning path
-
-### New to KB Labs plugins?
-
-1. **Start here:** [Getting Started](./docs/getting-started.md)
-2. **Understand structure:** [Architecture](./docs/architecture.md)
-3. **Add your first command:** [CLI Guide](./docs/cli-guide.md)
-4. **Add validation:** [Validation Examples](./docs/examples/validation-examples.md)
-5. **Write tests:** [Test Examples](./docs/examples/test-examples.md)
-
-### Building a SaaS plugin?
-
-1. **Multi-tenancy:** [Multi-Tenancy Examples](./docs/examples/multi-tenancy-examples.md)
-2. **Type-safe IDs:** [Contracts Examples](./docs/examples/contracts-examples.md)
-3. **REST API:** [REST Guide](./docs/rest-guide.md)
-4. **Rate limiting:** See multi-tenancy examples
-
-### Need specific patterns?
-
-- **Validation?** → [Validation Examples](./docs/examples/validation-examples.md)
-- **Testing?** → [Test Examples](./docs/examples/test-examples.md)
-- **Error handling?** → [utils/errors.ts](./packages/plugin-template-core/src/utils/errors.ts)
-- **CLI commands?** → [CLI Guide](./docs/cli-guide.md) + [cli/README.md](./packages/plugin-template-core/src/cli/README.md)
-- **REST handlers?** → [REST Guide](./docs/rest-guide.md) + [rest/README.md](./packages/plugin-template-core/src/rest/README.md)
-- **React widgets?** → [Studio Guide](./docs/studio-guide.md) + [studio/README.md](./packages/plugin-template-core/src/studio/README.md)
-
-## 🌟 Highlights
-
-### 7,700+ lines of documentation
-- 6 comprehensive folder READMEs (2,061 lines)
-- 4 production-ready example guides (2,500 lines)
-- 4 updated surface guides (1,395 lines)
-- Architecture docs (ADR, REFACTORING, architecture.md)
-
-### Complete error handling
-- 8 custom error classes with metadata
-- Type guards (isPluginError, isValidationError, isNotFoundError)
-- Formatting utilities (formatErrorForLogging, formatErrorForUser)
-- Assertions (assertNotNull, assertBusinessRule)
-- Error wrapping (wrapWithErrorHandling)
-
-### Production patterns
-- Zod validation (advanced schemas, custom validation, type inference)
-- Testing (CLI, REST, widgets, core, integration)
-- Contracts (type-safe IDs, validation helpers)
-- Multi-tenancy (rate limiting, quotas, data isolation)
-
-### No legacy code
-- 100% ctx.logger (createConsoleLogger deprecated)
-- 0 path aliases (simple imports)
-- 0 DDD layers (KB Labs standard folders)
-- Pure functions in core/ (no side effects)
-
-## 🤝 Contributing
-
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for:
-- Coding standards
-- KB Labs folder structure rules
-- PR checklist
-- Testing requirements
-
-## 📄 License
-
-MIT © KB Labs
+**User Guides:**
+- [English Guide](../LICENSE-GUIDE.en.md)
+- [Русское руководство](../LICENSE-GUIDE.ru.md)
 
 ---
 
-**Last updated:** 2025-11-30
-**Template version:** 2.0.0 (Flattened structure)
-**Documentation:** 7,735 lines
-**Status:** ✅ Production-ready gold standard
+**Note:** This plugin is part of the KB Labs ecosystem and requires the KB Labs platform to run. It cannot be used as a standalone npm package.

@@ -81,12 +81,16 @@ async function applyCommit(cwd: string, commit: CommitGroup): Promise<string> {
   const [repoPath, fileInfos] = Array.from(filesByRepo.entries())[0]!;
   const git: SimpleGit = simpleGit(repoPath);
 
-  // Stage files (using paths relative to the repo)
+  // CRITICAL: Reset staging area first to ensure we only commit the specific files for this commit
+  // Without this, git.commit() would commit ALL staged files, not just the ones we want
+  await git.reset(['--']);
+
+  // Stage only the files for this specific commit (using paths relative to the repo)
   for (const { relativePath } of fileInfos) {
     await git.add(relativePath);
   }
 
-  // Create commit
+  // Create commit with only the staged files
   const message = formatCommitMessage(commit);
   const result = await git.commit(message);
 

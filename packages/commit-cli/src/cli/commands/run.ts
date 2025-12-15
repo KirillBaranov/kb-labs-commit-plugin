@@ -65,15 +65,20 @@ export const runCommand = defineCommand({
     const llmComplete =
       llm && config.llm.enabled
         ? async (prompt: string, options?: { systemPrompt?: string; temperature?: number; maxTokens?: number }) => {
-            const result = await llm.complete(prompt, {
-              ...options,
-              temperature: options?.temperature ?? config.llm.temperature,
-              maxTokens: options?.maxTokens ?? config.llm.maxTokens,
-            });
-            return {
-              content: result.content,
-              tokensUsed: result.usage ? result.usage.promptTokens + result.usage.completionTokens : undefined,
-            };
+            try {
+              const result = await llm.complete(prompt, {
+                ...options,
+                temperature: options?.temperature ?? config.llm.temperature,
+                maxTokens: options?.maxTokens ?? config.llm.maxTokens,
+              });
+              return {
+                content: result.content,
+                tokensUsed: result.usage ? result.usage.promptTokens + result.usage.completionTokens : undefined,
+              };
+            } catch (error) {
+              console.error('[commit:run] LLM error:', error instanceof Error ? error.message : String(error));
+              throw error;
+            }
           }
         : undefined;
 

@@ -1,0 +1,50 @@
+/**
+ * KB Labs Commit Core
+ *
+ * Core business logic for AI-powered commit generation.
+ *
+ * @module @kb-labs/commit-core
+ */
+
+// Types
+export * from './types';
+
+// Analyzer
+export {
+  getGitStatus,
+  getAllChangedFiles,
+  hasChanges,
+  getCurrentBranch,
+  isProtectedBranch,
+  getFileSummaries,
+  formatFileSummary,
+  getRecentCommits,
+  detectCommitStyle,
+} from './analyzer';
+
+// Generator
+export {
+  generateCommitPlan,
+  buildPrompt,
+  parseResponse,
+  SYSTEM_PROMPT,
+  generateHeuristicPlan,
+} from './generator';
+
+// Applier
+export { applyCommitPlan, formatCommitMessage, pushCommits } from './applier';
+
+// Storage
+export {
+  getCommitStoragePath,
+  getCurrentPlanPath,
+  getCurrentStatusPath,
+  savePlan,
+  loadPlan,
+  loadStatus,
+  hasPlan,
+  clearPlan,
+  saveToHistory,
+  listHistory,
+  initStorage,
+} from './storage';

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@kb-labs/cli-core": [
+        "../kb-labs-cli/packages/cli-core/src/index.ts"
+      ],
+      "@kb-labs/cli-core/*": [
+        "../kb-labs-cli/packages/cli-core/src/*"
+      ],
+      "@kb-labs/core-sys": [
+        "../kb-labs-core/packages/core-sys/src/index.ts"
+      ],
+      "@kb-labs/core-sys/*": [
+        "../kb-labs-core/packages/core-sys/src/*"
+      ],
+      "@kb-labs/plugin-manifest": [
+        "../kb-labs-plugin/packages/plugin-manifest/src/index.ts"
+      ],
+      "@kb-labs/plugin-manifest/*": [
+        "../kb-labs-plugin/packages/plugin-manifest/src/*"
+      ],
+      "@kb-labs/plugin-runtime": [
+        "../kb-labs-plugin/packages/plugin-runtime/src/index.ts"
+      ],
+      "@kb-labs/plugin-runtime/*": [
+        "../kb-labs-plugin/packages/plugin-runtime/src/*"
+      ],
+      "@kb-labs/setup-engine-operations": [
+        "../kb-labs-setup-engine/packages/setup-engine-operations/src/index.ts"
+      ],
+      "@kb-labs/setup-engine-operations/*": [
+        "../kb-labs-setup-engine/packages/setup-engine-operations/src/*"
+      ],
+      "@kb-labs/shared-cli-ui": [
+        "../kb-labs-shared/packages/shared-cli-ui/src/index.ts"
+      ],
+      "@kb-labs/shared-cli-ui/*": [
+        "../kb-labs-shared/packages/shared-cli-ui/src/*"
+      ],
+      "@kb-labs/shared-command-kit": [
+        "../kb-labs-shared/packages/shared-command-kit/src/index.ts"
+      ],
+      "@kb-labs/shared-command-kit/*": [
+        "../kb-labs-shared/packages/shared-command-kit/src/*"
+      ]
+    }
+  }
+}

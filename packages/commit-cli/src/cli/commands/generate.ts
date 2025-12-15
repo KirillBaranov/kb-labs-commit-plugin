@@ -63,28 +63,17 @@ export const generateCommand = defineCommand({
     const llmComplete =
       llm && config.llm.enabled
         ? async (prompt: string, options?: { systemPrompt?: string; temperature?: number; maxTokens?: number }) => {
-            console.error('[commit:generate] LLM wrapper called');
-            try {
-              console.error('[commit:generate] Calling llm.complete...');
-              const result = await llm.complete(prompt, {
-                ...options,
-                temperature: options?.temperature ?? config.llm.temperature,
-                maxTokens: options?.maxTokens ?? config.llm.maxTokens,
-              });
-              console.error('[commit:generate] LLM success, content preview:', result.content.substring(0, 200));
-              return {
-                content: result.content,
-                tokensUsed: result.usage ? result.usage.promptTokens + result.usage.completionTokens : undefined,
-              };
-            } catch (error) {
-              console.error('[commit:generate] LLM error:', error instanceof Error ? error.message : String(error));
-              console.error('[commit:generate] Full error:', error);
-              throw error;
-            }
+            const result = await llm.complete(prompt, {
+              ...options,
+              temperature: options?.temperature ?? config.llm.temperature,
+              maxTokens: options?.maxTokens ?? config.llm.maxTokens,
+            });
+            return {
+              content: result.content,
+              tokensUsed: result.usage ? result.usage.promptTokens + result.usage.completionTokens : undefined,
+            };
           }
         : undefined;
-
-    console.error('[commit:generate] llmComplete:', !!llmComplete, 'llm:', !!llm, 'enabled:', config.llm.enabled);
 
     const plan = await generateCommitPlan({
       cwd,

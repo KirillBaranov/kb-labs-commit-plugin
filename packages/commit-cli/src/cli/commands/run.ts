@@ -203,6 +203,7 @@ export const runCommand = defineCommand({
         const coloredSha = colors?.muted?.(`[${shortSha}]`) ?? `[${shortSha}]`;
         ctx.ui?.write?.(`  ${coloredSha} ${firstLine}`);
       }
+      ctx.ui?.write?.('');
 
       // Summary box with stats
       const summary: Record<string, string | number> = {

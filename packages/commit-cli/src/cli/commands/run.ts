@@ -189,30 +189,35 @@ export const runCommand = defineCommand({
     if (flags.json) {
       ctx.ui?.json?.(output);
     } else {
-      // Print commits BEFORE the summary box (clean output)
-      ctx.ui?.write?.('\nApplied Commits:\n');
+      const colors = ctx.ui?.ui?.colors;
+      const symbols = ctx.ui?.ui?.symbols;
+
+      // Print commits with colors
+      ctx.ui?.write?.('\n');
       for (const c of applyResult.appliedCommits) {
         const shortSha = c.sha.substring(0, 7);
-        // Only show first line of message (no body)
         const firstLine = c.message.split('\n')[0];
-        ctx.ui?.write?.(`  ${shortSha} ${firstLine}\n`);
+        const coloredSha = colors?.muted?.(shortSha) ?? shortSha;
+        const checkmark = colors?.success?.(symbols?.success ?? '✓') ?? '✓';
+        ctx.ui?.write?.(`${checkmark} ${coloredSha} ${firstLine}\n`);
       }
       ctx.ui?.write?.('\n');
 
-      // Summary box with just stats
-      const summary: Record<string, string | number> = {
-        'Commits': applyResult.appliedCommits.length,
-        'Pushed': pushed ? 'Yes' : 'No',
-      };
-
+      // Summary stats
+      const stats: string[] = [];
+      stats.push(`${applyResult.appliedCommits.length} commit(s)`);
+      if (pushed) {
+        stats.push('pushed');
+      }
       if (plan.metadata.llmUsed) {
-        summary['LLM'] = plan.metadata.escalated ? 'Phase 2' : 'Phase 1';
-        if (plan.metadata.tokensUsed) {
-          summary['Tokens'] = plan.metadata.tokensUsed;
-        }
+        const phase = plan.metadata.escalated ? 'Phase 2' : 'Phase 1';
+        const tokens = plan.metadata.tokensUsed ? ` (${plan.metadata.tokensUsed} tokens)` : '';
+        stats.push(`LLM ${phase}${tokens}`);
       }
 
-      ctx.ui?.success?.('Commits Created', { summary });
+      const successMsg = colors?.success?.(`${symbols?.success ?? '✓'} Done`) ?? '✓ Done';
+      const statsLine = colors?.muted?.(stats.join(' · ')) ?? stats.join(' · ');
+      ctx.ui?.write?.(`${successMsg} ${statsLine}\n`);
     }
 
     return {

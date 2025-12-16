@@ -191,12 +191,16 @@ export const runCommand = defineCommand({
     } else {
       const colors = ctx.ui?.ui?.colors;
 
-      // Print commits list before the box
+      // Header
+      const header = colors?.bold?.('Applied commits:') ?? 'Applied commits:';
       ctx.ui?.write?.('');
+      ctx.ui?.write?.(header);
+
+      // Commits list
       for (const c of applyResult.appliedCommits) {
         const shortSha = c.sha.substring(0, 7);
         const firstLine = c.message.split('\n')[0];
-        const coloredSha = colors?.muted?.(shortSha) ?? shortSha;
+        const coloredSha = colors?.muted?.(`[${shortSha}]`) ?? `[${shortSha}]`;
         ctx.ui?.write?.(`  ${coloredSha} ${firstLine}`);
       }
 
@@ -213,7 +217,7 @@ export const runCommand = defineCommand({
         }
       }
 
-      ctx.ui?.success?.('Commits Created', { summary });
+      ctx.ui?.success?.('Done', { summary });
     }
 
     return {

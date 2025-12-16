@@ -107,7 +107,7 @@ export async function generateCommitPlan(options: GenerateOptions): Promise<Comm
         onProgress
       );
 
-      let parsed = parseResponse(result.content);
+      let parsed = parseResponse(result.content, summaries);
       llmUsed = true;
       tokensUsed = result.tokensUsed;
 
@@ -168,7 +168,7 @@ export async function generateCommitPlan(options: GenerateOptions): Promise<Comm
             onProgress
           );
 
-          parsed = parseResponse(resultWithDiff.content);
+          parsed = parseResponse(resultWithDiff.content, summaries);
           tokensUsed = (tokensUsed ?? 0) + (resultWithDiff.tokensUsed ?? 0);
           escalated = true;
         }

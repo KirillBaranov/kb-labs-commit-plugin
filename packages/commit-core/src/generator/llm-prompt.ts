@@ -30,6 +30,8 @@ Rules:
 7. Set confidence 0.0-1.0 for each commit (how sure you are about type/message)
 8. If ANY commit has confidence < 0.7, set needsMoreContext: true
 9. Scope should reflect the affected area (e.g., "cli", "api"), not individual files
+10. CRITICAL: If ALL files in a commit have status "deleted", use type "chore" or "refactor", NOT "feat"
+11. CRITICAL: If a commit is mostly deletions (>80% deletions), use "refactor" or "chore", NOT "feat"
 
 JSON schema:
 {
@@ -72,6 +74,8 @@ Rules:
 5. breaking: true only for breaking API changes
 6. Add "body" with bullet points explaining the actual changes you see in the diff
 7. Scope should reflect the affected area (e.g., "cli", "api"), not individual files
+8. CRITICAL: If ALL files in a commit are being DELETED (only deletions in diff), use type "chore" or "refactor", NOT "feat"
+9. CRITICAL: If a commit is mostly deletions (>80% of lines are deletions), use "refactor" or "chore", NOT "feat"
 
 JSON schema:
 {
@@ -167,7 +171,7 @@ export interface ParsedLLMResponse {
 /**
  * Parse LLM response into commit groups with confidence
  */
-export function parseResponse(response: string): ParsedLLMResponse {
+export function parseResponse(response: string, summaries?: FileSummary[]): ParsedLLMResponse {
   // Extract JSON from response (handle markdown code blocks)
   let jsonStr = response.trim();
 
@@ -210,8 +214,13 @@ export function parseResponse(response: string): ParsedLLMResponse {
     const totalConfidence = commits.reduce((sum: number, c: { confidence: number }) => sum + (c.confidence ?? 0.5), 0);
     const averageConfidence = commits.length > 0 ? totalConfidence / commits.length : 0;
 
+    // 🔧 Post-process: Fix incorrect commit types based on file status
+    const commitsWithFixedTypes = summaries
+      ? commits.map((c: CommitGroup & { confidence: number }) => fixCommitType(c, summaries))
+      : commits;
+
     // Extract confidence from commits for the response (CommitGroup doesn't have confidence)
-    const commitsWithoutConfidence: CommitGroup[] = commits.map((c: CommitGroup & { confidence: number }) => {
+    const commitsWithoutConfidence: CommitGroup[] = commitsWithFixedTypes.map((c: CommitGroup & { confidence: number }) => {
       const { confidence: _, ...commit } = c;
       void _;
       return commit;
@@ -228,6 +237,52 @@ export function parseResponse(response: string): ParsedLLMResponse {
       `Failed to parse LLM response: ${error instanceof Error ? error.message : 'Unknown error'}`
     );
   }
+}
+
+/**
+ * Fix commit type based on file status heuristics
+ * Prevents LLM from marking deletions as 'feat'
+ */
+function fixCommitType<T extends CommitGroup & { confidence: number }>(
+  commit: T,
+  summaries: FileSummary[]
+): T {
+  // Get summaries for files in this commit
+  const commitFiles = commit.files;
+  const commitSummaries = summaries.filter((s) => commitFiles.includes(s.path));
+
+  if (commitSummaries.length === 0) {
+    return commit; // No summaries, can't validate
+  }
+
+  // Rule 1: If ALL files are deleted, this is NOT a feat
+  const allDeleted = commitSummaries.every((s) => s.status === 'deleted');
+  if (allDeleted && commit.type === 'feat') {
+    return {
+      ...commit,
+      type: 'chore' as ConventionalType,
+      message: commit.message.replace(/^add /i, 'remove ').replace(/^added /i, 'removed '),
+    };
+  }
+
+  // Rule 2: If mostly deletions (>80% of changes are deletions), likely refactor/chore
+  const totalAdditions = commitSummaries.reduce((sum, s) => sum + s.additions, 0);
+  const totalDeletions = commitSummaries.reduce((sum, s) => sum + s.deletions, 0);
+  const totalChanges = totalAdditions + totalDeletions;
+
+  if (totalChanges > 0) {
+    const deletionRatio = totalDeletions / totalChanges;
+
+    // If >80% deletions and marked as 'feat', downgrade to 'refactor'
+    if (deletionRatio > 0.8 && commit.type === 'feat') {
+      return {
+        ...commit,
+        type: 'refactor' as ConventionalType,
+      };
+    }
+  }
+
+  return commit;
 }
 
 /**

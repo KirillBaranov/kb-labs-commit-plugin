@@ -190,34 +190,30 @@ export const runCommand = defineCommand({
       ctx.ui?.json?.(output);
     } else {
       const colors = ctx.ui?.ui?.colors;
-      const symbols = ctx.ui?.ui?.symbols;
 
-      // Print commits with colors
-      ctx.ui?.write?.('\n');
+      // Print commits list before the box
+      ctx.ui?.write?.('');
       for (const c of applyResult.appliedCommits) {
         const shortSha = c.sha.substring(0, 7);
         const firstLine = c.message.split('\n')[0];
         const coloredSha = colors?.muted?.(shortSha) ?? shortSha;
-        const checkmark = colors?.success?.(symbols?.success ?? '✓') ?? '✓';
-        ctx.ui?.write?.(`${checkmark} ${coloredSha} ${firstLine}\n`);
+        ctx.ui?.write?.(`  ${coloredSha} ${firstLine}`);
       }
-      ctx.ui?.write?.('\n');
 
-      // Summary stats
-      const stats: string[] = [];
-      stats.push(`${applyResult.appliedCommits.length} commit(s)`);
-      if (pushed) {
-        stats.push('pushed');
-      }
+      // Summary box with stats
+      const summary: Record<string, string | number> = {
+        'Commits': applyResult.appliedCommits.length,
+        'Pushed': pushed ? 'Yes' : 'No',
+      };
+
       if (plan.metadata.llmUsed) {
-        const phase = plan.metadata.escalated ? 'Phase 2' : 'Phase 1';
-        const tokens = plan.metadata.tokensUsed ? ` (${plan.metadata.tokensUsed} tokens)` : '';
-        stats.push(`LLM ${phase}${tokens}`);
+        summary['LLM'] = plan.metadata.escalated ? 'Phase 2' : 'Phase 1';
+        if (plan.metadata.tokensUsed) {
+          summary['Tokens'] = plan.metadata.tokensUsed;
+        }
       }
 
-      const successMsg = colors?.success?.(`${symbols?.success ?? '✓'} Done`) ?? '✓ Done';
-      const statsLine = colors?.muted?.(stats.join(' · ')) ?? stats.join(' · ');
-      ctx.ui?.write?.(`${successMsg} ${statsLine}\n`);
+      ctx.ui?.success?.('Commits Created', { summary });
     }
 
     return {

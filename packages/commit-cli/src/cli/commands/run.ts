@@ -189,7 +189,7 @@ export const runCommand = defineCommand({
     if (flags.json) {
       ctx.ui?.json?.(output);
     } else {
-      const colors = ctx.ui?.ui?.colors;
+      const colors = ctx.ui?.colors;
 
       // Header
       const header = colors?.bold?.('Applied commits:') ?? 'Applied commits:';

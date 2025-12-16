@@ -189,14 +189,19 @@ export const runCommand = defineCommand({
     if (flags.json) {
       ctx.ui?.json?.(output);
     } else {
-      // Build commits section with SHAs
-      const commitsItems = applyResult.appliedCommits.map((c) => {
+      // Print commits BEFORE the summary box (clean output)
+      ctx.ui?.write?.('\nApplied Commits:\n');
+      for (const c of applyResult.appliedCommits) {
         const shortSha = c.sha.substring(0, 7);
-        return `${shortSha} ${c.message}`;
-      });
+        // Only show first line of message (no body)
+        const firstLine = c.message.split('\n')[0];
+        ctx.ui?.write?.(`  ${shortSha} ${firstLine}\n`);
+      }
+      ctx.ui?.write?.('\n');
 
+      // Summary box with just stats
       const summary: Record<string, string | number> = {
-        'Commits Applied': applyResult.appliedCommits.length,
+        'Commits': applyResult.appliedCommits.length,
         'Pushed': pushed ? 'Yes' : 'No',
       };
 
@@ -207,10 +212,7 @@ export const runCommand = defineCommand({
         }
       }
 
-      ctx.ui?.success?.('Commits Created', {
-        summary,
-        sections: [{ header: 'Applied Commits', items: commitsItems }],
-      });
+      ctx.ui?.success?.('Commits Created', { summary });
     }
 
     return {

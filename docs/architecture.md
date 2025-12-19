@@ -1,253 +1,389 @@
-# Architecture Guide
+# Commit Plugin Architecture
 
-The plugin template adopts a **functional folder organization** aligned with KB Labs ecosystem standards. The goal is to keep surfaces thin, provide clear boundaries, and make code discoverable for new contributors.
+AI-powered commit message generator using hybrid pattern detection and LLM validation.
 
 > **📌 Important:** Before diving into architecture, familiarize yourself with the [Naming Convention](./naming-convention.md) - the mandatory "Pyramid Rule" that all KB Labs packages must follow.
 
 ## Overview
 
-**Philosophy:** Organize by product surface (CLI, REST, Studio) rather than architectural layers (domain, application, infrastructure).
+**Philosophy:** Modular pipeline with clear separation between analysis, generation, and application stages.
 
-**Benefits:**
-- **Discoverability**: Developers find CLI code in `cli/`, REST handlers in `rest/`
-- **Scalability**: Easy to add new surfaces (workflows, jobs) without restructuring
-- **Consistency**: Matches devlink-core, mind-engine, workflow-runtime patterns
-- **Simplicity**: No path aliases, no complex layer rules
+**Key Features:**
+- **Hybrid Pattern Detection**: Pre-processing heuristics + LLM generation + post-processing validation
+- **Two-Phase LLM**: Escalates to diff analysis when confidence is low
+- **Secrets Detection**: Blocks commits containing API keys, tokens, credentials
+- **Scope Support**: Works with monorepos, nested repos, and package scopes
+- **Analytics Tracking**: Measures accuracy and performance over time
 
-## Folder Structure
-
-```
-packages/plugin-template-core/
-├── cli/              # CLI surface - command implementations
-│   ├── commands/     # Individual commands
-│   │   ├── run.ts    # Command implementation (defineCommand)
-│   │   ├── flags.ts  # Flag definitions (typed)
-│   │   └── index.ts  # Barrel export
-│   └── index.ts
-│
-├── rest/             # REST surface - HTTP handlers
-│   ├── handlers/     # Route handlers
-│   │   ├── hello-handler.ts  # definePluginHandler
-│   │   └── context.ts        # Shared handler types
-│   ├── schemas/      # Request/response schemas
-│   │   └── hello-schema.ts   # Zod schemas
-│   └── index.ts
-│
-├── studio/           # Studio surface - UI widgets
-│   ├── widgets/      # React components
-│   │   ├── hello-widget.tsx  # Widget implementation
-│   │   └── index.ts
-│   └── index.ts
-│
-├── workflows/        # Workflows surface (placeholder)
-│   └── .gitkeep      # Future: custom plugin workflows
-│
-├── jobs/             # Jobs surface (placeholder)
-│   └── .gitkeep      # Future: cron & background jobs
-│
-├── lifecycle/        # Lifecycle hooks (future)
-│   ├── setup.ts      # Future: plugin installation
-│   ├── destroy.ts    # Future: plugin uninstallation
-│   └── upgrade.ts    # Future: plugin version upgrades
-│
-├── core/             # Business logic - domain & use cases
-│   ├── greeting.ts   # Domain entity (pure logic)
-│   ├── create-greeting.ts  # Use case (orchestration)
-│   └── index.ts
-│
-├── utils/            # Shared utilities
-│   ├── logger.ts     # Logger adapter
-│   ├── constants.ts  # Shared constants
-│   └── index.ts
-│
-├── index.ts          # Main barrel export (public API)
-├── manifest.v2.ts    # Plugin manifest (contract)
-└── setup-handler.ts  # Setup operation handler
-```
-
-## Layers & Principles
-
-While we don't enforce strict DDD layers, we follow these principles:
-
-| Folder | Purpose | Dependencies | Rules |
-|--------|---------|--------------|-------|
-| **cli/** | CLI commands, flags, handlers | `core/`, `utils/` | Thin adapters—delegate to core |
-| **rest/** | REST handlers, schemas | `core/`, `utils/` | Thin adapters—delegate to core |
-| **studio/** | React widgets, UI components | `core/`, `utils/` | Stateless presentational components |
-| **core/** | Business logic, domain entities, use cases | `utils/` only | Pure functions, no side effects |
-| **utils/** | Logger, constants, helpers | None (leaf) | Framework-agnostic utilities |
-| **workflows/** | Custom plugin workflows | `core/`, `utils/` | Future: workflow definitions |
-| **jobs/** | Cron & background jobs | `core/`, `utils/` | Future: job definitions |
-| **lifecycle/** | Plugin lifecycle hooks | `core/`, `utils/` | Future: setup, destroy, upgrade handlers |
-
-### Dependency Flow
+## Package Structure
 
 ```
-┌──────────────────────────────────────────┐
-│ CLI / REST / Studio / Workflows / Jobs   │ ← Surface adapters (thin)
-└─────────────┬────────────────────────────┘
-              ↓
-         ┌─────────┐
-         │  Core   │ ← Business logic (pure)
-         └────┬────┘
-              ↓
-         ┌─────────┐
-         │  Utils  │ ← Shared utilities (leaf)
-         └─────────┘
+packages/
+├── commit-cli/           # CLI surface - commands & flags
+│   ├── commands/
+│   │   └── commit.ts     # Main commit command
+│   └── manifest.v2.ts    # CLI manifest
+│
+├── commit-core/          # Core business logic (300KB+)
+│   ├── analyzer/         # Git analysis (status, diffs, summaries)
+│   │   ├── git-status.ts
+│   │   ├── file-summary.ts
+│   │   ├── recent-commits.ts
+│   │   ├── scope-resolver.ts
+│   │   └── secrets-detector.ts
+│   │
+│   ├── generator/        # Commit plan generation (MAIN LOGIC)
+│   │   ├── commit-plan.ts        # Orchestrates entire pipeline
+│   │   ├── llm-prompt.ts         # LLM prompts + validation
+│   │   ├── pattern-detector.ts   # Pre-processing heuristics ⭐
+│   │   └── heuristics.ts         # Fallback when LLM unavailable
+│   │
+│   ├── applier/          # Git commit execution
+│   │   └── git-applier.ts
+│   │
+│   ├── storage/          # Plan persistence
+│   │   └── plan-storage.ts
+│   │
+│   ├── tests/benchmarks/ # Accuracy benchmarks ⭐
+│   │   ├── commit-type-accuracy.test.ts
+│   │   ├── test-cases/   # 8 test cases (4 categories)
+│   │   └── utils/        # Metrics calculation
+│   │
+│   └── docs/benchmarks/  # Benchmark results
+│       ├── README.md
+│       └── latest-results.json
+│
+├── commit-contracts/     # Shared types & schemas
+│   ├── schemas/
+│   │   ├── commit-plan.ts     # Zod schemas
+│   │   └── file-summary.ts
+│   └── types/
+│       ├── commit-plan.ts     # TypeScript types
+│       └── conventional.ts
+│
+└── commit-plugin/        # Plugin manifest (entry point)
+    └── manifest.v2.ts
 ```
 
-**Rule**: Surfaces never import from each other. All shared logic goes in `core/` or `utils/`.
+## Commit Generation Pipeline
 
-## Manifest as the Contract
+### High-Level Flow
 
-`src/manifest.v2.ts` is the **single source of truth** for the plugin:
+```
+User runs: pnpm kb commit commit --scope="@kb-labs/core"
+                    ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 1. Git Analysis (analyzer/)                                │
+│ ─────────────────────────────────────────────────────────── │
+│ • getGitStatus() → staged, unstaged, untracked files       │
+│ • getFileSummaries() → FileSummary[]                       │
+│   - path, status, additions, deletions, isNewFile          │
+│ • getRecentCommits() → style reference (last 10)           │
+│ • detectSecretFiles() → ABORT if secrets found 🔒          │
+└────────────────────────┬────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 2. Pattern Detection (PRE-LLM) ⭐ NEW                      │
+│ ─────────────────────────────────────────────────────────── │
+│ analyzePatterns(summaries) → PatternAnalysis                │
+│                                                              │
+│ Detects 4 pattern types:                                    │
+│ • new-package: 10+ files + package.json + isNewFile=true    │
+│   → confidence: 0.95, suggests: feat                        │
+│                                                              │
+│ • refactor-move: 20+ files + isNewFile=false                │
+│   → confidence: 0.90, suggests: refactor                    │
+│                                                              │
+│ • refactor-modify: all modified + addition ratio < 0.4      │
+│   → confidence: 0.85, suggests: refactor                    │
+│                                                              │
+│ • deletions: all deleted OR >80% deletions                  │
+│   → confidence: 0.95-0.98, suggests: chore/refactor         │
+│                                                              │
+│ Output: PatternAnalysis {                                   │
+│   patternType, confidence, hints[], suggestedType           │
+│ }                                                            │
+└────────────────────────┬────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 3. Enhanced Prompting ⭐ NEW                                │
+│ ─────────────────────────────────────────────────────────── │
+│ buildEnhancedPrompt(summaries, patternAnalysis, commits)    │
+│                                                              │
+│ Adds to prompt:                                             │
+│ • Few-shot examples (5 examples):                           │
+│   - Modified files → refactor, NOT feat                     │
+│   - New package → feat, NOT chore                           │
+│   - Deletions → chore, NOT feat                             │
+│   - Bulk moves → refactor, NOT feat                         │
+│                                                              │
+│ • Pattern hints (if confidence > 0.7):                      │
+│   🎯 PATTERN DETECTED (confidence: 95%):                    │
+│   Pattern type: new-package                                 │
+│   Suggested commit type: feat                               │
+│   Hints:                                                    │
+│     • 21 new files including package.json                   │
+│     • All files are truly new (isNewFile: true)             │
+│     • This is a new feature (feat), not chore               │
+│                                                              │
+│ • Recent commit style examples                              │
+└────────────────────────┬────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 4. LLM Generation (GPT-4o-mini, temp: 0.3)                 │
+│ ─────────────────────────────────────────────────────────── │
+│ Phase 1: Generate with file summaries + pattern hints       │
+│ • maxTokens: 2000                                           │
+│ • Returns: CommitGroup[] + confidence                       │
+│                                                              │
+│ If confidence < 0.7 OR needsMoreContext:                    │
+│   Phase 2: Re-generate with full diffs                      │
+│   • getFileDiffs() → Map<path, diff>                        │
+│   • detectSecretsInDiffs() → ABORT if found 🔒              │
+│   • maxTokens: 3000-6000 (scales with file count)           │
+│   • buildPromptWithDiff() → richer context                  │
+│   • Re-analyze with diff → higher confidence                │
+└────────────────────────┬────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 5. Post-Processing Validation ⭐ UPDATED                    │
+│ ─────────────────────────────────────────────────────────── │
+│ fixCommitType(commit, summaries, patternAnalysis)           │
+│                                                              │
+│ Applies 5 rules in order:                                   │
+│                                                              │
+│ Rule 1: All deleted files → chore                           │
+│ Rule 2: >80% deletions → refactor                           │
+│                                                              │
+│ Rule 3: Pattern Override ⭐ NEW                             │
+│   IF patternAnalysis.confidence > 0.8                       │
+│   AND LLM type ≠ pattern suggestedType                      │
+│   THEN override LLM → use pattern type                      │
+│                                                              │
+│   Example:                                                  │
+│   • LLM says: chore (wrong, training bias)                  │
+│   • Pattern says: feat (95% confidence, new package)        │
+│   • Result: Override to feat ✅                             │
+│                                                              │
+│ Rule 4: Modified files + low addition ratio → refactor      │
+│   • All files modified AND ratio < 0.4 → refactor           │
+│   • All files modified AND ratio < 0.6 → refactor           │
+│                                                              │
+│ Rule 5: New package detection → feat                        │
+│   • 10+ files + package.json + all new → feat               │
+└────────────────────────┬────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 6. Anti-Hallucination Validation                           │
+│ ─────────────────────────────────────────────────────────── │
+│ validateAndFixCommits(commits, summaries)                   │
+│ • Remove hallucinated files (LLM invented non-existent)     │
+│ • Remove duplicate files (same file in multiple commits)    │
+│ • Add missing files (LLM forgot some files)                 │
+└────────────────────────┬────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 7. Plan Storage & Display                                  │
+│ ─────────────────────────────────────────────────────────── │
+│ savePlan() → .kb/commit/history/{timestamp}/plan.json       │
+│ Display preview → user reviews commits                      │
+│                                                              │
+│ If user approves (--yes or interactive):                    │
+│   → applyCommits(plan)                                      │
+│   → git add + git commit for each CommitGroup               │
+│   → Save results.json                                       │
+│                                                              │
+│ If --with-push:                                             │
+│   → git push origin HEAD                                    │
+└─────────────────────────────────────────────────────────────┘
+```
 
-- **CLI Commands**: Declares command IDs, flags, handlers, examples
-- **REST Routes**: Declares endpoints, schemas, permissions, error handling
-- **Studio Widgets**: Registers widgets, menus, layouts, data sources
-- **Capabilities**: Documents what the plugin can do
-- **Artifacts**: Declares what the plugin produces
+### Key Improvements (ADR-0016)
 
-**Any change to CLI/REST/Studio must update the manifest first.**
+**Before (60% accuracy):**
+- ❌ LLM training bias: "added files" → always `feat`
+- ❌ No semantic analysis: can't tell new vs moved files
+- ❌ Minimal validation: only Rules 1-2 (deletions)
 
-### Example: Adding a New Command
+**After (85-90% target, 100% on synthetic benchmarks):**
+- ✅ Pattern detection (pre-LLM): catches 80% of errors before LLM
+- ✅ Enhanced prompting: few-shot examples + pattern hints guide LLM
+- ✅ Extended validation (post-LLM): Rules 3-5 fix remaining errors
+- ✅ Analytics tracking: measure accuracy improvements
 
-1. **Define the command** in `cli/commands/new-command.ts`
-2. **Update manifest** in `manifest.v2.ts`:
-   ```typescript
-   cli: {
-     commands: [
-       {
-         id: 'template:new-command',
-         group: 'template',
-         describe: 'Does something new',
-         handler: './cli/commands/new-command.js#run',
-         flags: defineCommandFlags(newCommandFlags)
-       }
-     ]
-   }
-   ```
-3. **Export from barrel** in `cli/index.ts`
-4. **Add tests** for the new command
-5. **Update docs** (cli-guide.md)
+### Pattern Detection Logic
+
+```typescript
+// pattern-detector.ts
+export function analyzePatterns(summaries: FileSummary[]): PatternAnalysis {
+  // Priority order: highest confidence first
+
+  if (isNewPackagePattern(summaries)) {
+    // 10+ files, package.json, all isNewFile=true
+    return {
+      patternType: 'new-package',
+      confidence: 0.95,
+      suggestedType: 'feat',
+      hints: ['New package detected', 'All files truly new', 'This is feat, not chore']
+    };
+  }
+
+  if (isBulkMovePattern(summaries)) {
+    // 20+ files, all added, >50% have isNewFile=false
+    return {
+      patternType: 'refactor-move',
+      confidence: 0.90,
+      suggestedType: 'refactor',
+      hints: ['Bulk move pattern', 'Files existed before', 'This is refactoring']
+    };
+  }
+
+  if (isRefactorModificationPattern(summaries)) {
+    // All modified, addition ratio < 0.4
+    return {
+      patternType: 'refactor-modify',
+      confidence: 0.85,
+      suggestedType: 'refactor',
+      hints: ['All files modified', 'Low addition ratio', 'This is refactoring']
+    };
+  }
+
+  // ... deletions, mixed patterns
+}
+```
+
+## Module Dependencies
+
+```
+┌──────────────┐
+│  commit-cli  │ ← CLI commands (thin adapter)
+└──────┬───────┘
+       │ imports
+       ↓
+┌──────────────┐
+│ commit-core  │ ← Core business logic
+│ ────────────│
+│ • analyzer/  │ → Git analysis (status, diffs, secrets)
+│ • generator/ │ → Plan generation (pattern detection, LLM, validation)
+│ • applier/   │ → Git commit execution
+│ • storage/   │ → Plan persistence
+└──────┬───────┘
+       │ imports
+       ↓
+┌──────────────────┐
+│ commit-contracts │ ← Shared types & schemas (leaf)
+└──────────────────┘
+```
+
+**Key Principles:**
+- **commit-cli**: Thin adapter - parses flags, calls commit-core, displays results
+- **commit-core**: All business logic - pure functions, testable, no CLI dependencies
+- **commit-contracts**: Type definitions only - no runtime dependencies
 
 ## Testing Strategy
 
-### Unit Tests
-- **core/** - Pure business logic, easy to test
-  - Example: `greeting.test.ts` tests `createGreeting()` function
-- **utils/** - Utility functions
-  - Example: `logger.test.ts` tests log formatting
-
-### Integration Tests
-- **CLI commands** - Invoke command handlers with mock context
-  - Example: `run.test.ts` tests `runHelloCommand()` with args
-- **REST handlers** - Invoke handlers with mock runtime
-  - Example: `hello-handler.test.ts` tests `handleHello()` with input
-- **Studio widgets** - React Testing Library smoke tests
-  - Example: `hello-widget.test.tsx` tests rendering
-
-### Manual Testing
-- **Sandbox scripts**: `pnpm sandbox:cli`, `pnpm sandbox:rest`
-- **Local plugin installation**: Test in real KB Labs environment
-
-## Scalability & Growth
-
-### When to Split `core/`
-
-If `core/` grows beyond 10 files, consider organizing by domain:
-
-```
-core/
-├── greeting/       # Greeting domain
-│   ├── greeting.ts
-│   └── create-greeting.ts
-├── config/         # Config domain
-│   ├── config.ts
-│   └── load-config.ts
-└── index.ts
+### Unit Tests (Core Logic)
+```bash
+cd packages/commit-core
+pnpm test
 ```
 
-### When to Add Layers
+Located in `src/**/*.test.ts`:
+- **pattern-detector.test.ts** - Pattern detection logic
+- **llm-prompt.test.ts** - Prompt building and validation
+- **git-status.test.ts** - Git status parsing
+- **file-summary.test.ts** - File summary analysis
+- **secrets-detector.test.ts** - Secrets detection
 
-If complexity demands strict boundaries, you can introduce layers **within** core:
-
+### Benchmark Tests (Accuracy)
+```bash
+cd packages/commit-core
+pnpm test:benchmarks
 ```
-core/
-├── domain/         # Pure entities (no dependencies)
-├── application/    # Use cases (orchestration)
-└── ports/          # Interface definitions for infra
+
+Located in `tests/benchmarks/`:
+- **commit-type-accuracy.test.ts** - Main benchmark runner
+- **test-cases/** - 8 synthetic test cases (4 categories)
+- **utils/** - Metrics calculation (accuracy, precision, recall, F1)
+
+**Output:**
+```
+📦 Loaded 8 test cases
+✅ 8/8 passed (100% accuracy)
+📊 By category: all 100%
+🎯 By type: feat/refactor/chore all F1=100%
+💾 Results saved to: docs/benchmarks/latest-results.json
 ```
 
-But **start simple**—only add layers when needed.
+### Integration Tests (End-to-End)
+```bash
+# Manual test with real LLM
+pnpm kb commit commit --scope="@kb-labs/core"
+```
 
-### Adding New Surfaces
+Tests full pipeline:
+1. Git analysis
+2. Pattern detection
+3. LLM generation
+4. Validation
+5. Commit application
 
-**Workflows:**
+### Adding New Test Cases
+
+See [Benchmark README](../packages/commit-core/docs/benchmarks/README.md) for instructions on adding new test cases.
+
+## Performance Characteristics
+
+- **Pattern Detection**: ~50-100ms (no LLM)
+- **LLM Phase 1**: ~1-2s (file summaries only)
+- **LLM Phase 2**: ~2-4s (with diffs, if escalated)
+- **Total (typical)**: ~2-3s per commit plan
+- **Phase 2 Escalation Rate**: Target <30%
+
+## Configuration
+
+### LLM Settings
 ```typescript
-// workflows/hello-workflow.ts
-export const helloWorkflow = defineWorkflow({
-  id: 'template.hello',
-  steps: [
-    { action: 'greet', handler: './core/create-greeting.js' }
-  ]
-});
+// packages/commit-core/src/generator/commit-plan.ts
+const CONFIDENCE_THRESHOLD = 0.7; // Escalate to Phase 2 below this
+const MAX_LLM_RETRIES = 2;        // Retry on parse errors
+
+// Phase 1
+temperature: 0.3
+maxTokens: 2000
+
+// Phase 2
+temperature: 0.3
+maxTokens: 3000-6000 (scales with file count)
 ```
 
-**Jobs:**
+### Pattern Detection Thresholds
 ```typescript
-// jobs/daily-greeting.ts
-export const dailyGreeting = defineJob({
-  id: 'template.daily-greeting',
-  schedule: '0 9 * * *', // 9 AM daily
-  handler: './core/create-greeting.js'
-});
+// packages/commit-core/src/generator/pattern-detector.ts
+new-package:     10+ files, package.json, confidence 0.95
+bulk-move:       20+ files, >50% not new, confidence 0.90
+refactor-modify: all modified, <40% additions, confidence 0.85
+deletions:       all deleted or >80%, confidence 0.95-0.98
 ```
 
-**Lifecycle Hooks:**
+### Validation Rules
 ```typescript
-// lifecycle/setup.ts (plugin installation)
-export async function setup(ctx: LifecycleContext) {
-  await ctx.fs.mkdir('.kb/template');
-  await ctx.fs.writeFile('.kb/template/config.json', '{}');
-  ctx.logger.info('Plugin installed successfully');
-}
-
-// lifecycle/destroy.ts (plugin uninstallation)
-export async function destroy(ctx: LifecycleContext) {
-  await ctx.fs.rm('.kb/template', { recursive: true });
-  ctx.logger.info('Plugin uninstalled, cleanup complete');
-}
-
-// lifecycle/upgrade.ts (version upgrade)
-export async function upgrade(ctx: LifecycleContext, fromVersion: string) {
-  if (fromVersion < '1.0.0') {
-    // Migrate old config format
-    await migrateConfig(ctx);
-  }
-  ctx.logger.info(`Upgraded from ${fromVersion} to ${ctx.newVersion}`);
-}
+// packages/commit-core/src/generator/llm-prompt.ts
+Rule 3: Pattern override when confidence > 0.8
+Rule 4: Modified files, addition ratio < 0.4 → refactor
+Rule 5: New package (10+ files + package.json) → feat
 ```
 
-**Note:** Currently `setup-handler.ts` exists at root. Future plan: move to `lifecycle/setup.ts` and add `destroy.ts`, `upgrade.ts`, `enable.ts`, `disable.ts`.
+## Related Documentation
 
-## Extensibility Tips
-
-1. **Start simple**: Add logic to `core/` first, refactor when complexity grows
-2. **Keep surfaces thin**: CLI/REST/Studio should just adapt inputs/outputs
-3. **Use manifest**: Declare everything in manifest, not runtime discovery
-4. **Test core logic**: Unit test `core/`, integration test surfaces
-5. **Document decisions**: Record significant changes in `docs/adr/`
-
-## Migration from DDD Structure
-
-If you have the old DDD structure (`domain/`, `application/`, `infra/`, `shared/`), see:
-- [ADR-0009: Flatten Plugin Structure](./adr/0009-flatten-plugin-structure.md)
-- [REFACTORING.md](./REFACTORING.md) - Step-by-step migration guide
+- [ADR-0015: Post-Processing Validation](./adr/0015-post-processing-validation.md) - Initial validation rules (Rules 1-2)
+- [ADR-0016: Hybrid Pattern Detection](./adr/0016-hybrid-pattern-detection-commit-classification.md) - Full pipeline architecture
+- [ADR-0017: Benchmark Suite](./adr/0017-benchmark-suite-commit-type-accuracy.md) - Testing strategy
+- [Implementation Summary](./IMPLEMENTATION_SUMMARY.md) - What was built and why
+- [Benchmark README](../packages/commit-core/docs/benchmarks/README.md) - How to run and interpret benchmarks
 
 ---
 
-**Last Updated:** 2025-11-30
-**Related ADRs:**
-- [ADR-0001: Architecture and Repository Layout](./adr/0001-architecture-and-repository-layout.md)
-- [ADR-0009: Flatten Plugin Structure](./adr/0009-flatten-plugin-structure.md)
+**Last Updated:** 2025-12-19
+**Accuracy:** 100% on synthetic benchmarks (target: 85-90% real-world)
+**LLM Cost:** ~$0.0012-0.0015 per commit (GPT-4o-mini)

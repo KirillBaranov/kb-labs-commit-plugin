@@ -6,7 +6,7 @@ export default defineConfig({
   tsconfig: 'tsconfig.build.json',
   entry: [
     'src/index.ts',
-    'src/manifest.v2.ts',
+    'src/manifest.ts',
     'src/lifecycle/setup.ts',
     'src/cli/commands/run.ts',
     'src/cli/commands/generate.ts',

@@ -1,29 +1,31 @@
 /**
- * KB Labs Commit Plugin - Manifest V2
+ * KB Labs Commit Plugin - Manifest V3
  *
- * Uses only @kb-labs/sdk as the single dependency on platform.
+ * Migration from V2 to V3 following best practices from V3-MIGRATION-GUIDE.md
+ *
+ * Key changes:
+ * - Schema: kb.plugin/3
+ * - Commands use handler#default suffix
+ * - Commands have handlerPath field
+ * - All imports from @kb-labs/sdk
  */
 
-import {
-  defineManifest,
-  defineCommandFlags,
-  permissions,
-  generateExamples,
-} from '@kb-labs/sdk';
+import { permissions, defineCommandFlags } from '@kb-labs/sdk';
 import { pluginContractsManifest, COMMIT_ENV_VARS } from '@kb-labs/commit-contracts';
 import {
+  runFlags,
   generateFlags,
   applyFlags,
   pushFlags,
-  runFlags,
   jsonOnlyFlags,
   emptyFlags,
 } from './cli/commands/flags';
 
-export const manifest = defineManifest<typeof pluginContractsManifest>({
-  schema: 'kb.plugin/2',
+export const manifest = {
+  schema: 'kb.plugin/3',
   id: '@kb-labs/commit',
   version: '0.1.0',
+
   display: {
     name: 'Commit Generator',
     description: 'AI-powered commit generation with conventional commit support.',
@@ -36,36 +38,44 @@ export const manifest = defineManifest<typeof pluginContractsManifest>({
     optional: ['llm', 'analytics', 'logger'],
   },
 
-  // Setup handler - initialize .kb/commit/ directory
-  setup: {
-    handler: './lifecycle/setup.js#run',
-    describe: 'Initialize .kb/commit/ directory structure.',
-    permissions: permissions.combine(
-      permissions.presets.pluginWorkspace('commit'),
-      {
-        quotas: { timeoutMs: 10000, memoryMb: 128, cpuMs: 3000 },
-      }
-    ),
-  },
+  // TODO: Implement V3 setup handler
+  // Setup temporarily disabled during migration - needs proper V3 implementation
+  // setup: {
+  //   handler: './lifecycle/setup.js#default',
+  //   handlerPath: './lifecycle/setup.js',
+  //   describe: 'Initialize .kb/commit/ directory structure.',
+  //   permissions: permissions.combine(
+  //     permissions.presets.pluginWorkspace('commit'),
+  //     {
+  //       quotas: { timeoutMs: 10000, memoryMb: 128, cpuMs: 3000 },
+  //     }
+  //   ),
+  // },
 
+  // V3: cli wrapper with commands array
   cli: {
     commands: [
       // Main command: commit (default flow)
       {
-        id: 'commit',
+        id: 'commit:commit',  // ✅ With plugin prefix
         group: 'commit',
         describe: 'Generate and apply commits (default flow).',
         longDescription:
           'Analyzes changes, generates commit plan with LLM, applies commits locally. ' +
           'Use --dry-run to preview without applying, --with-push to push after applying.',
+
+        // ✅ V3: handler with #default suffix
+        handler: './cli/commands/run.js#default',
+        handlerPath: './cli/commands/run.js',
+
         flags: defineCommandFlags(runFlags),
-        examples: generateExamples('commit', 'commit', [
-          { description: 'Default flow', flags: {} },
-          { description: 'Dry run (generate only)', flags: { 'dry-run': true } },
-          { description: 'With automatic push', flags: { 'with-push': true } },
-          { description: 'Scope to specific path', flags: { scope: 'src/components/**' } },
-        ]),
-        handler: './cli/commands/run.js#runCommand',
+
+        examples: [
+          'kb commit commit',
+          'kb commit commit --dry-run',
+          'kb commit commit --with-push',
+          'kb commit commit --scope "src/components/**"',
+        ],
       },
 
       // commit:generate - Generate commit plan
@@ -76,13 +86,17 @@ export const manifest = defineManifest<typeof pluginContractsManifest>({
         longDescription:
           'Analyzes staged and unstaged changes using git diff, then uses LLM to group ' +
           'related changes and generate conventional commit messages.',
+
+        handler: './cli/commands/generate.js#default',
+        handlerPath: './cli/commands/generate.js',
+
         flags: defineCommandFlags(generateFlags),
-        examples: generateExamples('generate', 'commit', [
-          { description: 'Generate plan', flags: {} },
-          { description: 'JSON output', flags: { json: true } },
-          { description: 'Scope to path', flags: { scope: 'packages/**' } },
-        ]),
-        handler: './cli/commands/generate.js#generateCommand',
+
+        examples: [
+          'kb commit generate',
+          'kb commit generate --json',
+          'kb commit generate --scope "packages/**"',
+        ],
       },
 
       // commit:apply - Apply commit plan
@@ -93,12 +107,16 @@ export const manifest = defineManifest<typeof pluginContractsManifest>({
         longDescription:
           'Creates git commits according to the current plan. Checks for staleness ' +
           '(working tree changes since plan generation) unless --force is used.',
+
+        handler: './cli/commands/apply.js#default',
+        handlerPath: './cli/commands/apply.js',
+
         flags: defineCommandFlags(applyFlags),
-        examples: generateExamples('apply', 'commit', [
-          { description: 'Apply plan', flags: {} },
-          { description: 'Force apply', flags: { force: true } },
-        ]),
-        handler: './cli/commands/apply.js#applyCommand',
+
+        examples: [
+          'kb commit apply',
+          'kb commit apply --force',
+        ],
       },
 
       // commit:push - Push commits
@@ -109,11 +127,15 @@ export const manifest = defineManifest<typeof pluginContractsManifest>({
         longDescription:
           'Pushes local commits to the remote. Refuses force push to protected branches ' +
           '(main, master) by default.',
+
+        handler: './cli/commands/push.js#default',
+        handlerPath: './cli/commands/push.js',
+
         flags: defineCommandFlags(pushFlags),
-        examples: generateExamples('push', 'commit', [
-          { description: 'Push commits', flags: {} },
-        ]),
-        handler: './cli/commands/push.js#pushCommand',
+
+        examples: [
+          'kb commit push',
+        ],
       },
 
       // commit:open - Show current plan
@@ -122,12 +144,16 @@ export const manifest = defineManifest<typeof pluginContractsManifest>({
         group: 'commit',
         describe: 'Show current commit plan.',
         longDescription: 'Displays the current commit plan if one exists.',
+
+        handler: './cli/commands/open.js#default',
+        handlerPath: './cli/commands/open.js',
+
         flags: defineCommandFlags(jsonOnlyFlags),
-        examples: generateExamples('open', 'commit', [
-          { description: 'View plan', flags: {} },
-          { description: 'JSON output', flags: { json: true } },
-        ]),
-        handler: './cli/commands/open.js#openCommand',
+
+        examples: [
+          'kb commit open',
+          'kb commit open --json',
+        ],
       },
 
       // commit:reset - Clear current plan
@@ -136,16 +162,22 @@ export const manifest = defineManifest<typeof pluginContractsManifest>({
         group: 'commit',
         describe: 'Clear current commit plan.',
         longDescription: 'Removes the current commit plan from storage.',
+
+        handler: './cli/commands/reset.js#default',
+        handlerPath: './cli/commands/reset.js',
+
         flags: defineCommandFlags(emptyFlags),
-        examples: ['kb commit reset'],
-        handler: './cli/commands/reset.js#resetCommand',
+
+        examples: [
+          'kb commit reset',
+        ],
       },
     ],
   },
 
   capabilities: [],
 
-  // Global permissions using presets
+  // ✅ V3: Manifest-first permissions (set once for entire plugin)
   permissions: permissions.combine(
     permissions.presets.pluginWorkspace('commit'),
     permissions.presets.llmApi(['openai', 'anthropic']),
@@ -158,7 +190,7 @@ export const manifest = defineManifest<typeof pluginContractsManifest>({
         allow: [...COMMIT_ENV_VARS], // Environment variable overrides
       },
       quotas: {
-        timeoutMs: 120000, // 2 min for LLM
+        timeoutMs: 600000, // 10 min for LLM (generation can take time with large diffs)
         memoryMb: 512,
         cpuMs: 30000,
       },
@@ -178,6 +210,6 @@ export const manifest = defineManifest<typeof pluginContractsManifest>({
       description: 'Git status snapshot at plan generation time.',
     },
   ],
-});
+};
 
 export default manifest;

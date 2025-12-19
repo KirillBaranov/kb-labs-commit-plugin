@@ -3,17 +3,16 @@
  * Initializes .kb/commit/ directory structure and config
  */
 
-import { defineSetup } from '@kb-labs/sdk/lifecycle';
-import { defaultCommitConfig, type CommitPluginConfig } from '@kb-labs/commit-contracts';
+import { defaultCommitConfig } from '@kb-labs/commit-contracts';
 
 const COMMIT_DIR = '.kb/commit';
 
 /**
- * Plugin setup using declarative defineSetup API
+ * Plugin setup configuration
  *
  * Uses CommitPluginConfig from contracts as single source of truth.
  */
-export const setup = defineSetup<CommitPluginConfig>({
+export const setup = {
   files: [
     {
       path: `${COMMIT_DIR}/README.md`,
@@ -97,7 +96,7 @@ export const setup = defineSetup<CommitPluginConfig>({
     'Set KB_COMMIT_LLM_ENABLED=false to use heuristics only.',
     'Use `kb commit:open` to view current plan before applying.',
   ],
-});
+};
 
 /**
  * Setup handler function (for manifest registration)

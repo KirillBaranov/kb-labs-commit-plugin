@@ -3,74 +3,91 @@
  * Push commits to remote
  */
 
-import { defineCommand, useLoader, findRepoRoot, type CommandResult } from '@kb-labs/sdk';
+import { defineCommand, useLoader, findRepoRoot, type PluginContextV3 } from '@kb-labs/sdk';
 import { pushCommits } from '@kb-labs/commit-core';
 import type { PushOutput } from '@kb-labs/commit-contracts';
-import { pushFlags } from './flags';
 
-type PushCommandResult = CommandResult & {
-  result?: PushOutput;
+type PushInput = {
+  force?: boolean;
+  json?: boolean;
 };
 
-export const pushCommand = defineCommand({
-  name: 'commit:push',
-  flags: pushFlags,
+type PushResult = {
+  exitCode: number;
+  result?: PushOutput;
+  meta?: Record<string, unknown>;
+};
 
-  async handler(ctx: any, _argv: string[], flags: any): Promise<PushCommandResult> {
-    const cwd = (await findRepoRoot(ctx.cwd || process.cwd())) ?? process.cwd();
+export default defineCommand({
+  id: 'commit:push',
+  description: 'Push commits to remote',
 
-    // Push
-    const pushLoader = useLoader('Pushing commits...');
-    pushLoader.start();
-    const result = await pushCommits(cwd, {
-      force: flags.force,
-    });
+  handler: {
+    async execute(ctx: PluginContextV3, input: PushInput): Promise<PushResult> {
+      const startTime = Date.now();
+      const cwd = (await findRepoRoot(ctx.cwd || process.cwd())) ?? process.cwd();
 
-    // Output
-    const output: PushOutput = {
-      success: result.success,
-      remote: result.remote,
-      branch: result.branch,
-      commits: result.commitsPushed,
-    };
+      // Push
+      const pushLoader = useLoader('Pushing commits...');
+      pushLoader.start();
+      const result = await pushCommits(cwd, {
+        force: input.force,
+      });
 
-    if (result.success) {
-      if (result.commitsPushed > 0) {
-        pushLoader.succeed(`Pushed ${result.commitsPushed} commit(s) to ${result.remote}/${result.branch}`);
+      // Output
+      const output: PushOutput = {
+        success: result.success,
+        remote: result.remote,
+        branch: result.branch,
+        commits: result.commitsPushed,
+      };
+
+      if (result.success) {
+        if (result.commitsPushed > 0) {
+          pushLoader.succeed(`Pushed ${result.commitsPushed} commit(s) to ${result.remote}/${result.branch}`);
+        } else {
+          pushLoader.succeed('Nothing to push - already up to date');
+        }
       } else {
-        pushLoader.succeed('Nothing to push - already up to date');
+        pushLoader.fail(`Failed to push: ${result.error}`);
       }
-    } else {
-      pushLoader.fail(`Failed to push: ${result.error}`);
-    }
 
-    if (flags.json) {
-      ctx.ui?.json?.(output);
-    } else if (!result.success) {
-      // Show error details
-      ctx.ui?.error?.('Push Failed', {
-        summary: {
-          'Remote': result.remote || 'unknown',
-          'Branch': result.branch || 'unknown',
-          'Error': result.error || 'Unknown error',
-        },
-      });
-    } else if (result.commitsPushed > 0) {
-      // Show success details
-      ctx.ui?.success?.('Push Successful', {
-        summary: {
-          'Commits pushed': result.commitsPushed,
-          'Remote': result.remote || 'origin',
-          'Branch': result.branch || 'main',
-          'Status': '✅ Up to date',
-        },
-      });
-    }
+      if (input.json) {
+        ctx.ui?.json?.(output);
+      } else if (!result.success) {
+        // Show error details
+        ctx.ui?.error?.('Push Failed', {
+          sections: [{
+            header: 'Details',
+            items: [
+              `Remote: ${result.remote || 'unknown'}`,
+              `Branch: ${result.branch || 'unknown'}`,
+              `Error: ${result.error || 'Unknown error'}`,
+            ],
+          }],
+        });
+      } else if (result.commitsPushed > 0) {
+        // Show success details
+        ctx.ui?.success?.('Push Successful', {
+          sections: [{
+            header: 'Details',
+            items: [
+              `Commits pushed: ${result.commitsPushed}`,
+              `Remote: ${result.remote || 'origin'}`,
+              `Branch: ${result.branch || 'main'}`,
+              'Status: ✅ Up to date',
+            ],
+          }],
+        });
+      }
 
-    return {
-      ok: result.success,
-      result: output,
-      error: result.error,
-    };
+      return {
+        exitCode: result.success ? 0 : 1,
+        result: output,
+        meta: {
+          timing: Date.now() - startTime,
+        },
+      };
+    },
   },
 });

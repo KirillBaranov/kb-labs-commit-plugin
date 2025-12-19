@@ -13,4 +13,4 @@ export * from './cli';
 export * from './lifecycle';
 
 // Manifest
-export { manifest } from './manifest.v2';
+export { manifest } from './manifest';

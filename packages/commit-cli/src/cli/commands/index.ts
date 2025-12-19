@@ -1,8 +1,5 @@
 // CLI commands
 export * from './flags';
-export { runCommand } from './run';
-export { generateCommand } from './generate';
-export { applyCommand } from './apply';
-export { pushCommand } from './push';
-export { openCommand } from './open';
-export { resetCommand } from './reset';
+
+// V3: Commands are default exports, imported directly by manifest
+// No need to re-export them here

@@ -4,8 +4,6 @@
  * DRY pattern: Define flags once, use in both manifest and command handlers.
  */
 
-import type { FlagSchemaDefinition } from '@kb-labs/sdk';
-
 /**
  * Flags for commit:generate command
  */
@@ -20,7 +18,7 @@ export const generateFlags = {
     description: 'Output JSON',
     default: false,
   },
-} as const satisfies FlagSchemaDefinition;
+} as const;
 
 export type GenerateFlags = typeof generateFlags;
 
@@ -39,7 +37,7 @@ export const applyFlags = {
     description: 'Output JSON',
     default: false,
   },
-} as const satisfies FlagSchemaDefinition;
+} as const;
 
 export type ApplyFlags = typeof applyFlags;
 
@@ -58,7 +56,7 @@ export const pushFlags = {
     description: 'Output JSON',
     default: false,
   },
-} as const satisfies FlagSchemaDefinition;
+} as const;
 
 export type PushFlags = typeof pushFlags;
 
@@ -86,7 +84,7 @@ export const runFlags = {
     description: 'Push after apply',
     default: false,
   },
-} as const satisfies FlagSchemaDefinition;
+} as const;
 
 export type RunFlags = typeof runFlags;
 
@@ -99,13 +97,13 @@ export const jsonOnlyFlags = {
     description: 'Output JSON',
     default: false,
   },
-} as const satisfies FlagSchemaDefinition;
+} as const;
 
 export type JsonOnlyFlags = typeof jsonOnlyFlags;
 
 /**
  * Empty flags for commands that take no arguments
  */
-export const emptyFlags = {} as const satisfies FlagSchemaDefinition;
+export const emptyFlags = {} as const;
 
 export type EmptyFlags = typeof emptyFlags;

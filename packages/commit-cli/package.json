@@ -12,15 +12,15 @@
       "types": "./dist/index.d.ts"
     },
     "./plugin-manifest": {
-      "import": "./dist/manifest.v2.js",
-      "types": "./dist/manifest.v2.d.ts"
+      "import": "./dist/manifest.js",
+      "types": "./dist/manifest.d.ts"
     },
     "./cli": "./dist/cli/index.js",
     "./lifecycle": "./dist/lifecycle/index.js",
     "./dist/*": "./dist/*"
   },
   "kb": {
-    "manifest": "./dist/manifest.v2.js"
+    "manifest": "./dist/manifest.js"
   },
   "files": [
     "dist",

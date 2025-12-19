@@ -3,89 +3,105 @@
  * Show current commit plan
  */
 
-import { defineCommand, findRepoRoot, type CommandResult } from '@kb-labs/sdk';
+import { defineCommand, findRepoRoot, type PluginContextV3 } from '@kb-labs/sdk';
 import { loadPlan, getCurrentPlanPath, formatCommitMessage } from '@kb-labs/commit-core';
 import type { OpenOutput } from '@kb-labs/commit-contracts';
-import { jsonOnlyFlags } from './flags';
 
-type OpenCommandResult = CommandResult & {
-  result?: OpenOutput;
+type OpenInput = {
+  json?: boolean;
 };
 
-export const openCommand = defineCommand({
-  name: 'commit:open',
-  flags: jsonOnlyFlags,
+type OpenResult = {
+  exitCode: number;
+  result?: OpenOutput;
+  meta?: Record<string, unknown>;
+};
 
-  async handler(ctx: any, _argv: string[], flags: any): Promise<OpenCommandResult> {
-    const cwd = (await findRepoRoot(ctx.cwd || process.cwd())) ?? process.cwd();
+export default defineCommand({
+  id: 'commit:open',
+  description: 'Show current commit plan',
 
-    // Load current plan
-    const plan = await loadPlan(cwd);
-    const planPath = getCurrentPlanPath(cwd);
+  handler: {
+    async execute(ctx: PluginContextV3, input: OpenInput): Promise<OpenResult> {
+      const startTime = Date.now();
+      const cwd = (await findRepoRoot(ctx.cwd || process.cwd())) ?? process.cwd();
 
-    // Output
-    const output: OpenOutput = {
-      hasPlan: plan !== null,
-      plan: plan ?? undefined,
-      planPath: plan ? planPath : undefined,
-    };
+      // Load current plan
+      const plan = await loadPlan(cwd);
+      const planPath = getCurrentPlanPath(cwd);
 
-    if (flags.json) {
-      ctx.ui?.json?.(output);
-    } else {
-      if (!plan) {
-        ctx.ui?.info?.('No commit plan found. Run `kb commit:generate` to create one.');
+      // Output
+      const output: OpenOutput = {
+        hasPlan: plan !== null,
+        plan: plan ?? undefined,
+        planPath: plan ? planPath : undefined,
+      };
+
+      if (input.json) {
+        ctx.ui?.json?.(output);
       } else {
-        // Build commits section
-        const commitsItems = plan.commits.map((commit, i) => {
-          const message = formatCommitMessage(commit);
-          const breaking = commit.breaking ? ' ⚠️  BREAKING' : '';
-          return `${i + 1}. ${message} [${commit.files.length} file(s)]${breaking}`;
-        });
-
-        // Build git status section
-        const status = plan.gitStatus;
-        const statusItems = [
-          `Staged: ${status.staged.length} file(s)`,
-          `Unstaged: ${status.unstaged.length} file(s)`,
-          `Untracked: ${status.untracked.length} file(s)`,
-        ];
-
-        const sections: Array<{ header?: string; items: string[] }> = [];
-
-        sections.push({
-          header: 'Commits',
-          items: commitsItems,
-        });
-
-        sections.push({
-          header: 'Git Status (at generation)',
-          items: statusItems,
-        });
-
-        const summary: Record<string, string | number> = {
-          'Plan path': planPath,
-          'Created': plan.createdAt,
-          'Total files': plan.metadata.totalFiles,
-          'Total commits': plan.metadata.totalCommits,
-        };
-
-        if (plan.metadata.llmUsed) {
-          summary['Generator'] = plan.metadata.escalated ? 'LLM (Phase 2)' : 'LLM (Phase 1)';
+        if (!plan) {
+          ctx.ui?.info?.('No commit plan found. Run `kb commit:generate` to create one.');
         } else {
-          summary['Generator'] = 'Heuristics';
+          // Build commits section
+          const commitsItems = plan.commits.map((commit, i) => {
+            const message = formatCommitMessage(commit);
+            const breaking = commit.breaking ? ' ⚠️  BREAKING' : '';
+            return `${i + 1}. ${message} [${commit.files.length} file(s)]${breaking}`;
+          });
+
+          // Build git status section
+          const status = plan.gitStatus;
+          const statusItems = [
+            `Staged: ${status.staged.length} file(s)`,
+            `Unstaged: ${status.unstaged.length} file(s)`,
+            `Untracked: ${status.untracked.length} file(s)`,
+          ];
+
+          const sections: Array<{ header?: string; items: string[] }> = [];
+
+          sections.push({
+            header: 'Commits',
+            items: commitsItems,
+          });
+
+          sections.push({
+            header: 'Git Status (at generation)',
+            items: statusItems,
+          });
+
+          const summaryItems: string[] = [
+            `Plan path: ${planPath}`,
+            `Created: ${plan.createdAt}`,
+            `Total files: ${plan.metadata.totalFiles}`,
+            `Total commits: ${plan.metadata.totalCommits}`,
+          ];
+
+          if (plan.metadata.llmUsed) {
+            const generator = plan.metadata.escalated ? 'LLM (Phase 2)' : 'LLM (Phase 1)';
+            summaryItems.push(`Generator: ${generator}`);
+          } else {
+            summaryItems.push('Generator: Heuristics');
+          }
+
+          sections.unshift({
+            header: 'Summary',
+            items: summaryItems,
+          });
+
+          ctx.ui?.success?.('Current Commit Plan', {
+            sections,
+          });
         }
-
-        ctx.ui?.success?.('Current Commit Plan', {
-          summary,
-          sections,
-        });
       }
-    }
 
-    return {
-      ok: true,
-      result: output,
-    };
+      return {
+        exitCode: 0,
+        result: output,
+        meta: {
+          timing: Date.now() - startTime,
+        },
+      };
+    },
   },
 });

@@ -3,7 +3,16 @@
  * Generate commit plan from git changes
  */
 
-import { defineCommand, useLLM, useLoader, useConfig, findRepoRoot, displayArtifacts, type CommandResult, type ArtifactInfo } from '@kb-labs/sdk';
+import {
+  defineCommand,
+  useLLM,
+  useLoader,
+  useConfig,
+  findRepoRoot,
+  displayArtifacts,
+  type PluginContextV3,
+  type ArtifactInfo,
+} from '@kb-labs/sdk';
 import { stat } from 'node:fs/promises';
 import {
   generateCommitPlan,
@@ -15,162 +24,182 @@ import {
 import {
   type GenerateOutput,
   type CommitPluginConfig,
-  type CommitEnv,
   resolveCommitConfig,
+  generateFlags,
+  type GenerateFlags,
+  commitEnv,
 } from '@kb-labs/commit-contracts';
-import { generateFlags } from './flags';
 
-type GenerateCommandResult = CommandResult & {
+// Input type with backward compatibility
+type GenerateInput = GenerateFlags & { argv?: string[] };
+
+type GenerateResult = {
+  exitCode: number;
   result?: GenerateOutput;
+  meta?: Record<string, unknown>;
 };
 
-export const generateCommand = defineCommand({
-  name: 'commit:generate',
-  flags: generateFlags,
+export default defineCommand({
+  id: 'commit:generate',
+  description: 'Generate commit plan from git changes',
 
-  async handler(ctx: any, _argv: string[], flags: any): Promise<GenerateCommandResult> {
-    const llm = useLLM();
-    const cwd = (await findRepoRoot(ctx.cwd || process.cwd())) ?? process.cwd();
+  handler: {
+    async execute(ctx: PluginContextV3, input: GenerateInput): Promise<GenerateResult> {
+      const startTime = Date.now();
+      const llm = useLLM();
+      const cwd = (await findRepoRoot(ctx.cwd || process.cwd())) ?? process.cwd();
 
-    // Load config from kb.config.json + env overrides
-    const fileConfig = await useConfig<Partial<CommitPluginConfig>>();
-    const env = (ctx.env ?? {}) as CommitEnv;
-    const config = resolveCommitConfig(fileConfig ?? {}, env);
+      // Load config from kb.config.json + env overrides
+      const fileConfig = await useConfig<Partial<CommitPluginConfig>>();
 
-    // Use CLI flag scope, or fallback to config default scope
-    const effectiveScope = flags.scope ?? config.scope?.default;
+      // V3: Parse env variables with type safety and validation
+      const env = commitEnv.parse(ctx.runtime);
 
-    // Check for changes
-    const statusLoader = useLoader('Checking git status...');
-    statusLoader.start();
-    const status = await getGitStatus(cwd, { scope: effectiveScope });
+      const config = resolveCommitConfig(fileConfig ?? {}, env);
 
-    if (!hasChanges(status)) {
-      statusLoader.stop();
-      ctx.ui?.warn?.('No changes to commit');
-      return {
-        ok: false,
-        error: 'No changes to commit',
-      };
-    }
-    statusLoader.succeed('Found changes to commit');
+      // V3: Flags come in input.flags object (not auto-merged)
+      const effectiveScope = (input as any).flags?.scope ?? input.scope ?? config.scope?.default;
 
-    // Generate plan
-    const analyzeLoader = useLoader('Analyzing changes...');
-    analyzeLoader.start();
+      // Check for changes
+      const statusLoader = useLoader('Checking git status...');
+      statusLoader.start();
+      const status = await getGitStatus(cwd, { scope: effectiveScope });
 
-    // Create LLM wrapper with config values
-    const llmComplete =
-      llm && config.llm.enabled
-        ? async (prompt: string, options?: { systemPrompt?: string; temperature?: number; maxTokens?: number }) => {
-            const result = await llm.complete(prompt, {
-              ...options,
-              temperature: options?.temperature ?? config.llm.temperature,
-              maxTokens: options?.maxTokens ?? config.llm.maxTokens,
-            });
-            return {
-              content: result.content,
-              tokensUsed: result.usage ? result.usage.promptTokens + result.usage.completionTokens : undefined,
-            };
-          }
-        : undefined;
+      if (!hasChanges(status)) {
+        statusLoader.stop();
+        ctx.ui?.warn?.('No changes to commit');
+        return {
+          exitCode: 1,
+        };
+      }
+      statusLoader.succeed('Found changes to commit');
 
-    const plan = await generateCommitPlan({
-      cwd,
-      scope: effectiveScope,
-      llmComplete,
-      config,
-      onProgress: (message) => analyzeLoader.update({ text: message }),
-    });
+      // Generate plan
+      const analyzeLoader = useLoader('Analyzing changes...');
+      analyzeLoader.start();
 
-    // Save plan
-    const saveLoader = useLoader('Saving plan...');
-    saveLoader.start();
-    await savePlan(cwd, plan);
-    const planPath = getCurrentPlanPath(cwd);
-    saveLoader.succeed('Plan saved');
+      // Create LLM wrapper with config values
+      const llmComplete =
+        llm && config.llm.enabled
+          ? async (prompt: string, options?: { systemPrompt?: string; temperature?: number; maxTokens?: number }) => {
+              const result = await llm.complete(prompt, {
+                ...options,
+                temperature: options?.temperature ?? config.llm.temperature,
+                maxTokens: options?.maxTokens ?? config.llm.maxTokens,
+              });
+              return {
+                content: result.content,
+                tokensUsed: result.usage ? result.usage.promptTokens + result.usage.completionTokens : undefined,
+              };
+            }
+          : undefined;
 
-    analyzeLoader.succeed(`Generated commit plan with ${plan.commits.length} commit(s)`);
-
-    // Output
-    const output: GenerateOutput = {
-      plan,
-      planPath,
-    };
-
-    if (flags.json) {
-      ctx.ui?.json?.(output);
-    } else {
-      // Build commits section
-      const commitsItems = plan.commits.map((commit) => {
-        const scope = commit.scope ? `(${commit.scope})` : '';
-        return `${commit.type}${scope}: ${commit.message} [${commit.files.length} file(s)]`;
+      const plan = await generateCommitPlan({
+        cwd,
+        scope: effectiveScope,
+        llmComplete,
+        config,
+        onProgress: (message) => analyzeLoader.update({ text: message }),
       });
 
-      // Build artifacts section
-      const artifacts: ArtifactInfo[] = [];
-      try {
-        const planStats = await stat(planPath);
-        artifacts.push({
-          name: 'Commit Plan',
-          path: planPath,
-          size: planStats.size,
-          modified: planStats.mtime,
-          description: 'Generated commit plan in JSON format',
-        });
-      } catch {
-        // Ignore stat errors
-      }
+      // Save plan
+      const saveLoader = useLoader('Saving plan...');
+      saveLoader.start();
+      await savePlan(cwd, plan);
+      const planPath = getCurrentPlanPath(cwd);
+      saveLoader.succeed('Plan saved');
 
-      const sections: Array<{ header?: string; items: string[] }> = [];
+      analyzeLoader.succeed(`Generated commit plan with ${plan.commits.length} commit(s)`);
 
-      // Add commits section
-      if (commitsItems.length > 0) {
-        sections.push({
-          header: 'Commits',
-          items: commitsItems,
-        });
-      }
-
-      // Add artifacts section
-      if (artifacts.length > 0) {
-        const artifactsLines = displayArtifacts(artifacts, {
-          showSize: true,
-          showTime: true,
-          showDescription: true,
-          maxItems: 10,
-          title: '',
-        });
-        sections.push({
-          header: 'Artifacts',
-          items: artifactsLines,
-        });
-      }
-
-      // Build summary
-      const summary: Record<string, string | number> = {
-        'Files': plan.metadata.totalFiles,
-        'Commits': plan.metadata.totalCommits,
+      // Output
+      const output: GenerateOutput = {
+        plan,
+        planPath,
       };
 
-      if (plan.metadata.llmUsed) {
-        summary['LLM'] = plan.metadata.escalated ? 'Phase 2 (with diff)' : 'Phase 1';
-        if (plan.metadata.tokensUsed) {
-          summary['Tokens'] = plan.metadata.tokensUsed;
-        }
+      // V3: Flags are auto-merged by bootstrap.ts, just use directly
+      if (input.json) {
+        ctx.ui?.json?.(output);
       } else {
-        summary['Generator'] = 'Heuristics';
+        // Build commits section
+        const commitsItems = plan.commits.map((commit) => {
+          const scope = commit.scope ? `(${commit.scope})` : '';
+          return `${commit.type}${scope}: ${commit.message} [${commit.files.length} file(s)]`;
+        });
+
+        // Build artifacts section
+        const artifacts: ArtifactInfo[] = [];
+        try {
+          const planStats = await stat(planPath);
+          artifacts.push({
+            name: 'Commit Plan',
+            path: planPath,
+            size: planStats.size,
+            modified: planStats.mtime,
+            description: 'Generated commit plan in JSON format',
+          });
+        } catch {
+          // Ignore stat errors
+        }
+
+        const sections: Array<{ header?: string; items: string[] }> = [];
+
+        // Add commits section
+        if (commitsItems.length > 0) {
+          sections.push({
+            header: 'Commits',
+            items: commitsItems,
+          });
+        }
+
+        // Add artifacts section
+        if (artifacts.length > 0) {
+          const artifactsLines = displayArtifacts(artifacts, {
+            showSize: true,
+            showTime: true,
+            showDescription: true,
+            maxItems: 10,
+            title: '',
+          });
+          sections.push({
+            header: 'Artifacts',
+            items: artifactsLines,
+          });
+        }
+
+        // Build summary section
+        const summaryItems: string[] = [
+          `Files: ${plan.metadata.totalFiles}`,
+          `Commits: ${plan.metadata.totalCommits}`,
+        ];
+
+        if (plan.metadata.llmUsed) {
+          const llmPhase = plan.metadata.escalated ? 'Phase 2 (with diff)' : 'Phase 1';
+          summaryItems.push(`LLM: ${llmPhase}`);
+          if (plan.metadata.tokensUsed) {
+            summaryItems.push(`Tokens: ${plan.metadata.tokensUsed}`);
+          }
+        } else {
+          summaryItems.push('Generator: Heuristics');
+        }
+
+        sections.unshift({
+          header: 'Summary',
+          items: summaryItems,
+        });
+
+        ctx.ui?.success?.('Commit Plan Generated', {
+          sections,
+        });
       }
 
-      ctx.ui?.success?.('Commit Plan Generated', {
-        summary,
-        sections,
-      });
-    }
-
-    return {
-      ok: true,
-      result: output,
-    };
+      return {
+        exitCode: 0,
+        result: output,
+        meta: {
+          timing: Date.now() - startTime,
+        },
+      };
+    },
   },
 });

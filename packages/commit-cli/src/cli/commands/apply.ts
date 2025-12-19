@@ -3,7 +3,7 @@
  * Apply current commit plan
  */
 
-import { defineCommand, useLoader, findRepoRoot, type CommandResult } from '@kb-labs/sdk';
+import { defineCommand, useLoader, findRepoRoot, type PluginContextV3 } from '@kb-labs/sdk';
 import {
   applyCommitPlan,
   loadPlan,
@@ -11,120 +11,140 @@ import {
   clearPlan,
 } from '@kb-labs/commit-core';
 import type { ApplyOutput } from '@kb-labs/commit-contracts';
-import { applyFlags } from './flags';
 
-type ApplyCommandResult = CommandResult & {
-  result?: ApplyOutput;
+type ApplyInput = {
+  force?: boolean;
+  json?: boolean;
 };
 
-export const applyCommand = defineCommand({
-  name: 'commit:apply',
-  flags: applyFlags,
+type ApplyResult = {
+  exitCode: number;
+  result?: ApplyOutput;
+  meta?: Record<string, unknown>;
+};
 
-  async handler(ctx: any, _argv: string[], flags: any): Promise<ApplyCommandResult> {
-    const cwd = (await findRepoRoot(ctx.cwd || process.cwd())) ?? process.cwd();
+export default defineCommand({
+  id: 'commit:apply',
+  description: 'Apply current commit plan',
 
-    // Load current plan
-    const loadLoader = useLoader('Loading commit plan...');
-    loadLoader.start();
-    const plan = await loadPlan(cwd);
+  handler: {
+    async execute(ctx: PluginContextV3, input: ApplyInput): Promise<ApplyResult> {
+      const startTime = Date.now();
+      const cwd = (await findRepoRoot(ctx.cwd || process.cwd())) ?? process.cwd();
 
-    if (!plan) {
-      loadLoader.fail('No commit plan found');
-      ctx.ui?.error?.('Run `kb commit:generate` first.');
-      return {
-        ok: false,
-        error: 'No commit plan found',
-      };
-    }
+      // Load current plan
+      const loadLoader = useLoader('Loading commit plan...');
+      loadLoader.start();
+      const plan = await loadPlan(cwd);
 
-    if (plan.commits.length === 0) {
-      loadLoader.stop();
-      ctx.ui?.warn?.('Commit plan is empty. Nothing to apply.');
-      return {
-        ok: true,
-        result: {
-          success: true,
-          commits: [],
-          errors: [],
-        },
-      };
-    }
-    loadLoader.succeed(`Loaded plan with ${plan.commits.length} commit(s)`);
+      if (!plan) {
+        loadLoader.fail('No commit plan found');
+        ctx.ui?.error?.('Run `kb commit:generate` first.');
+        return {
+          exitCode: 1,
+        };
+      }
 
-    // Apply plan
-    const applyLoader = useLoader(`Applying ${plan.commits.length} commit(s)...`);
-    applyLoader.start();
-    const result = await applyCommitPlan(cwd, plan, {
-      force: flags.force,
-    });
+      if (plan.commits.length === 0) {
+        loadLoader.stop();
+        ctx.ui?.warn?.('Commit plan is empty. Nothing to apply.');
+        return {
+          exitCode: 0,
+          result: {
+            success: true,
+            commits: [],
+            errors: [],
+          },
+          meta: {
+            timing: Date.now() - startTime,
+          },
+        };
+      }
+      loadLoader.succeed(`Loaded plan with ${plan.commits.length} commit(s)`);
 
-    // Save to history and clear current plan on success
-    if (result.success) {
-      await saveToHistory(cwd, plan, result);
-      await clearPlan(cwd);
-      applyLoader.succeed(`Applied ${result.appliedCommits.length} commit(s) successfully`);
-    } else {
-      applyLoader.fail('Failed to apply commits');
-    }
+      // Apply plan
+      const applyLoader = useLoader(`Applying ${plan.commits.length} commit(s)...`);
+      applyLoader.start();
+      const result = await applyCommitPlan(cwd, plan, {
+        force: input.force,
+      });
 
-    // Output
-    const output: ApplyOutput = {
-      success: result.success,
-      commits: result.appliedCommits.map((c) => ({
-        id: c.groupId,
-        sha: c.sha,
-        message: c.message,
-      })),
-      errors: result.errors,
-    };
-
-    if (flags.json) {
-      ctx.ui?.json?.(output);
-    } else {
+      // Save to history and clear current plan on success
       if (result.success) {
-        // Build commits section
-        const commitsItems = result.appliedCommits.map((commit) => {
-          return `${commit.sha.substring(0, 7)} ${commit.message}`;
-        });
+        await saveToHistory(cwd, plan, result);
+        await clearPlan(cwd);
+        applyLoader.succeed(`Applied ${result.appliedCommits.length} commit(s) successfully`);
+      } else {
+        applyLoader.fail('Failed to apply commits');
+      }
 
-        const sections: Array<{ header?: string; items: string[] }> = [];
+      // Output
+      const output: ApplyOutput = {
+        success: result.success,
+        commits: result.appliedCommits.map((c) => ({
+          id: c.groupId,
+          sha: c.sha,
+          message: c.message,
+        })),
+        errors: result.errors,
+      };
 
-        if (commitsItems.length > 0) {
-          sections.push({
-            header: 'Applied Commits',
-            items: commitsItems,
+      if (input.json) {
+        ctx.ui?.json?.(output);
+      } else {
+        if (result.success) {
+          // Build commits section
+          const commitsItems = result.appliedCommits.map((commit) => {
+            return `${commit.sha.substring(0, 7)} ${commit.message}`;
+          });
+
+          const sections: Array<{ header?: string; items: string[] }> = [];
+
+          if (commitsItems.length > 0) {
+            sections.push({
+              header: 'Applied Commits',
+              items: commitsItems,
+            });
+          }
+
+          const summaryItems: string[] = [
+            `Total commits: ${result.appliedCommits.length}`,
+            'Status: ✅ Success',
+          ];
+
+          sections.unshift({
+            header: 'Summary',
+            items: summaryItems,
+          });
+
+          ctx.ui?.success?.('Commits Applied', {
+            sections,
+          });
+        } else {
+          const errorItems = result.errors.map((error) => `❌ ${error}`);
+
+          ctx.ui?.error?.('Failed to Apply Commits', {
+            sections: [
+              {
+                header: 'Summary',
+                items: [`Total errors: ${result.errors.length}`],
+              },
+              {
+                header: 'Errors',
+                items: errorItems,
+              },
+            ],
           });
         }
-
-        const summary: Record<string, string | number> = {
-          'Total commits': result.appliedCommits.length,
-          'Status': '✅ Success',
-        };
-
-        ctx.ui?.success?.('Commits Applied', {
-          summary,
-          sections,
-        });
-      } else {
-        const errorItems = result.errors.map((error) => `❌ ${error}`);
-
-        ctx.ui?.error?.('Failed to Apply Commits', {
-          summary: {
-            'Total errors': result.errors.length,
-          },
-          sections: [{
-            header: 'Errors',
-            items: errorItems,
-          }],
-        });
       }
-    }
 
-    return {
-      ok: result.success,
-      result: output,
-      error: result.success ? undefined : result.errors.join('; '),
-    };
+      return {
+        exitCode: result.success ? 0 : 1,
+        result: output,
+        meta: {
+          timing: Date.now() - startTime,
+        },
+      };
+    },
   },
 });

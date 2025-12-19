@@ -13,6 +13,48 @@ function isTextFile(file: DiffResultTextFile | DiffResultBinaryFile): file is Di
 }
 
 /**
+ * Check if file is truly new (never existed in repo history)
+ * Returns true if file has no creation history in git
+ * Supports nested git repositories
+ */
+async function isNewFile(cwd: string, filePath: string): Promise<boolean> {
+  try {
+    // Determine correct git repo for this file (handle nested repos)
+    const segments = filePath.split('/');
+    const potentialRepoDir = segments[0];
+    const potentialRepoPath = `${cwd}/${potentialRepoDir}`;
+    const potentialGitDir = `${potentialRepoPath}/.git`;
+
+    // Check if it's a nested git repo
+    const isNestedRepo = await existsAsync(potentialGitDir);
+
+    let git: SimpleGit;
+    let relativeFilePath: string;
+
+    if (isNestedRepo) {
+      // Use nested repo as git root, strip first segment from path
+      git = simpleGit(potentialRepoPath);
+      relativeFilePath = segments.slice(1).join('/');
+    } else {
+      // Use cwd as git root
+      git = simpleGit(cwd);
+      relativeFilePath = filePath;
+    }
+
+    // Check if file has creation history (when it was first added)
+    // git log --diff-filter=A --format=%H -1 -- <file>
+    // Returns commit hash if file was created, empty if never existed
+    const result = await git.log(['--diff-filter=A', '--format=%H', '-1', '--', relativeFilePath]);
+
+    // If no commits found, file is truly new (never existed before)
+    return result.all.length === 0;
+  } catch {
+    // On error, assume it's new (safer to say "new" than claim it existed)
+    return true;
+  }
+}
+
+/**
  * Get file summaries with diff stats for given files
  */
 export async function getFileSummaries(cwd: string, files: string[]): Promise<FileSummary[]> {
@@ -29,6 +71,10 @@ export async function getFileSummaries(cwd: string, files: string[]): Promise<Fi
     const diffSummary = await git.diffSummary(['--cached', '--', ...files]);
 
     for (const file of diffSummary.files) {
+      // Check if file is truly new (never existed in repo history)
+      // Pass cwd to support nested repos
+      const isNew = await isNewFile(cwd, file.file);
+
       // Handle both text and binary files
       if (isTextFile(file)) {
         summaries.push({
@@ -37,6 +83,7 @@ export async function getFileSummaries(cwd: string, files: string[]): Promise<Fi
           additions: file.insertions,
           deletions: file.deletions,
           binary: false,
+          isNewFile: isNew,
         });
       } else {
         // Binary file
@@ -46,6 +93,7 @@ export async function getFileSummaries(cwd: string, files: string[]): Promise<Fi
           additions: 0,
           deletions: 0,
           binary: true,
+          isNewFile: isNew,
         });
       }
     }
@@ -53,12 +101,14 @@ export async function getFileSummaries(cwd: string, files: string[]): Promise<Fi
     // Add any missing files (untracked)
     const missingFiles = files.filter((f) => !summaries.some((s) => s.path === f));
     for (const file of missingFiles) {
+      // Untracked files are always new
       summaries.push({
         path: file,
         status: 'added',
         additions: 0,
         deletions: 0,
         binary: false,
+        isNewFile: true,
       });
     }
   } catch {
@@ -70,6 +120,7 @@ export async function getFileSummaries(cwd: string, files: string[]): Promise<Fi
         additions: 0,
         deletions: 0,
         binary: false,
+        isNewFile: false, // Conservative assumption - treat as existing file
       });
     }
   }

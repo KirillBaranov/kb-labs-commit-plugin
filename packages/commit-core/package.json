@@ -44,7 +44,9 @@
     "lint:fix": "eslint src --ext .ts --fix",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:benchmarks": "vitest run tests/benchmarks/commit-type-accuracy.test.ts",
+    "test:all": "vitest run && vitest run tests/benchmarks/commit-type-accuracy.test.ts"
   },
   "dependencies": {
     "@kb-labs/commit-contracts": "workspace:*",

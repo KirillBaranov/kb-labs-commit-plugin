@@ -8,30 +8,56 @@ import { dirname, extname, basename } from 'node:path';
 /**
  * Generate commit plan using heuristics (no LLM)
  *
- * Groups files by:
- * 1. Directory (same directory = same commit)
- * 2. File type (test files, docs, config)
+ * Enhanced grouping strategy:
+ * 1. Package.json changes + related files in same directory
+ * 2. Test files paired with their implementation
+ * 3. Remaining files grouped by directory + category
  */
 export function generateHeuristicPlan(summaries: FileSummary[]): CommitGroup[] {
   if (summaries.length === 0) {
     return [];
   }
 
-  // Group files by category
-  const groups = new Map<string, FileSummary[]>();
-
-  for (const summary of summaries) {
-    const category = categorizeFile(summary.path);
-    const existing = groups.get(category) || [];
-    existing.push(summary);
-    groups.set(category, existing);
-  }
-
-  // Convert groups to commits
   const commits: CommitGroup[] = [];
   let commitIndex = 1;
 
-  for (const [category, files] of groups) {
+  // Strategy 1: Group package.json changes with files in same directory
+  const { packageGroups, remainingFiles } = groupPackageJsonChanges(summaries);
+
+  for (const group of packageGroups) {
+    commits.push({
+      id: `c${commitIndex++}`,
+      type: 'chore',
+      scope: inferPackageScope(group.map(f => f.path)),
+      message: 'update dependencies',
+      files: group.map((f) => f.path),
+      releaseHint: 'none',
+      breaking: false,
+    });
+  }
+
+  // Strategy 2: Pair test files with their implementation
+  const { pairedGroups, unpairedFiles } = pairTestsWithImplementation(remainingFiles);
+
+  for (const group of pairedGroups) {
+    const implFile = group.find(f => !isTestFile(f.path));
+    const type = inferTypeFromChanges(implFile);
+
+    commits.push({
+      id: `c${commitIndex++}`,
+      type,
+      scope: inferScope(group.map(f => f.path)),
+      message: generateMessage(type, group),
+      files: group.map((f) => f.path),
+      releaseHint: inferReleaseHint(type, group),
+      breaking: false,
+    });
+  }
+
+  // Strategy 3: Group remaining files by category and directory
+  const categoryGroups = groupByCategory(unpairedFiles);
+
+  for (const [category, files] of categoryGroups) {
     const type = categoryToType(category);
     const scope = inferScope(files.map((f) => f.path));
 
@@ -47,6 +73,181 @@ export function generateHeuristicPlan(summaries: FileSummary[]): CommitGroup[] {
   }
 
   return commits;
+}
+
+/**
+ * Group package.json changes with related files in same directory
+ */
+function groupPackageJsonChanges(summaries: FileSummary[]): {
+  packageGroups: FileSummary[][];
+  remainingFiles: FileSummary[];
+} {
+  const packageFiles = summaries.filter(f => f.path.endsWith('package.json'));
+  const otherFiles = summaries.filter(f => !f.path.endsWith('package.json'));
+
+  if (packageFiles.length === 0) {
+    return { packageGroups: [], remainingFiles: summaries };
+  }
+
+  const packageGroups: FileSummary[][] = [];
+  const claimed = new Set<FileSummary>();
+
+  for (const pkgFile of packageFiles) {
+    const pkgDir = dirname(pkgFile.path);
+
+    // Find files in same directory as package.json
+    const related = otherFiles.filter(f => {
+      const fileDir = dirname(f.path);
+      // Same directory or one level deep
+      return fileDir === pkgDir || fileDir.startsWith(pkgDir + '/');
+    });
+
+    // Limit to config-related files only
+    const configRelated = related.filter(f => {
+      const name = basename(f.path);
+      return (
+        name.includes('config') ||
+        name.includes('tsconfig') ||
+        name.endsWith('.json') ||
+        name.startsWith('.')
+      );
+    });
+
+    const group = [pkgFile, ...configRelated];
+    packageGroups.push(group);
+
+    claimed.add(pkgFile);
+    configRelated.forEach(f => claimed.add(f));
+  }
+
+  const remainingFiles = summaries.filter(f => !claimed.has(f));
+
+  return { packageGroups, remainingFiles };
+}
+
+/**
+ * Pair test files with their implementation files
+ */
+function pairTestsWithImplementation(summaries: FileSummary[]): {
+  pairedGroups: FileSummary[][];
+  unpairedFiles: FileSummary[];
+} {
+  const testFiles = summaries.filter(f => isTestFile(f.path));
+  const implFiles = summaries.filter(f => !isTestFile(f.path));
+
+  const pairedGroups: FileSummary[][] = [];
+  const pairedImpls = new Set<FileSummary>();
+  const pairedTests = new Set<FileSummary>();
+
+  for (const testFile of testFiles) {
+    const implPath = getImplementationPath(testFile.path);
+    const implFile = implFiles.find(f => f.path === implPath);
+
+    if (implFile) {
+      pairedGroups.push([implFile, testFile]);
+      pairedImpls.add(implFile);
+      pairedTests.add(testFile);
+    }
+  }
+
+  const unpairedFiles = [
+    ...implFiles.filter(f => !pairedImpls.has(f)),
+    ...testFiles.filter(f => !pairedTests.has(f)),
+  ];
+
+  return { pairedGroups, unpairedFiles };
+}
+
+/**
+ * Check if file is a test file
+ */
+function isTestFile(path: string): boolean {
+  return (
+    path.includes('.test.') ||
+    path.includes('.spec.') ||
+    path.includes('/__tests__/')
+  );
+}
+
+/**
+ * Get implementation path from test path
+ * Example: src/__tests__/foo.test.ts -> src/foo.ts
+ */
+function getImplementationPath(testPath: string): string {
+  // Remove test suffix
+  let implPath = testPath
+    .replace(/\.test\.(ts|tsx|js|jsx)$/, '.$1')
+    .replace(/\.spec\.(ts|tsx|js|jsx)$/, '.$1');
+
+  // Remove __tests__ directory
+  implPath = implPath.replace('/__tests__/', '/');
+
+  return implPath;
+}
+
+/**
+ * Group files by category (for ungrouped files)
+ */
+function groupByCategory(summaries: FileSummary[]): Map<string, FileSummary[]> {
+  const groups = new Map<string, FileSummary[]>();
+
+  for (const summary of summaries) {
+    const category = categorizeFile(summary.path);
+    const existing = groups.get(category) || [];
+    existing.push(summary);
+    groups.set(category, existing);
+  }
+
+  return groups;
+}
+
+/**
+ * Infer package scope from paths
+ */
+function inferPackageScope(paths: string[]): string | undefined {
+  const packagePath = paths.find(p => p.endsWith('package.json'));
+  if (!packagePath) return undefined;
+
+  // Extract monorepo package name from path
+  // Example: kb-labs-cli/package.json -> kb-labs-cli
+  const parts = packagePath.split('/');
+  if (parts.length > 1) {
+    return parts[parts.length - 2]; // Directory before package.json
+  }
+
+  return undefined;
+}
+
+/**
+ * Infer commit type from file changes (additions vs deletions)
+ */
+function inferTypeFromChanges(file?: FileSummary): ConventionalType {
+  if (!file) return 'chore';
+
+  const { additions, deletions, status } = file;
+
+  // New file -> feat
+  if (status === 'added' || (additions > 0 && deletions === 0)) {
+    return 'feat';
+  }
+
+  // Deleted file -> chore
+  if (status === 'deleted' || (deletions > 0 && additions === 0)) {
+    return 'chore';
+  }
+
+  // More additions than deletions -> feat
+  if (additions > deletions * 2) {
+    return 'feat';
+  }
+
+  // More deletions than additions -> refactor
+  if (deletions > additions * 2) {
+    return 'refactor';
+  }
+
+  // Mixed changes -> refactor
+  return 'refactor';
 }
 
 /**

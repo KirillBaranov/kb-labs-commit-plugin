@@ -4,7 +4,7 @@
 
 import type { CommitPlan, GitStatus, FileSummary, CommitGroup } from '@kb-labs/commit-contracts';
 import type { GenerateOptions } from '../types';
-import { useLogger } from '@kb-labs/sdk';
+import { useLogger, useAnalytics } from '@kb-labs/sdk';
 import { getGitStatus, getAllChangedFiles } from '../analyzer/git-status';
 import { getFileSummaries, getFileDiffs } from '../analyzer/file-summary';
 import { getRecentCommits } from '../analyzer/recent-commits';
@@ -12,12 +12,14 @@ import { resolveScope, matchesScope, type ResolvedScope } from '../analyzer/scop
 import {
   buildPrompt,
   buildPromptWithDiff,
+  buildEnhancedPrompt,
   parseResponse,
   SYSTEM_PROMPT,
   SYSTEM_PROMPT_WITH_DIFF,
   type ParsedLLMResponse,
 } from './llm-prompt';
 import { generateHeuristicPlan } from './heuristics';
+import { analyzePatterns, type PatternAnalysis } from './pattern-detector';
 import { minimatch } from 'minimatch';
 import {
   detectSecretFiles,
@@ -36,7 +38,10 @@ const MAX_LLM_RETRIES = 2;
  */
 export async function generateCommitPlan(options: GenerateOptions): Promise<CommitPlan> {
   const { cwd, scope, llmComplete, onProgress } = options;
+
   const logger = useLogger();
+  const analytics = useAnalytics();
+  const startTime = Date.now();
 
   // 1. Resolve scope first if provided
   // Supports: package names (@kb-labs/core), wildcards (@kb-labs/*), and path patterns (packages/**)
@@ -83,10 +88,30 @@ export async function generateCommitPlan(options: GenerateOptions): Promise<Comm
   // 4. Get file summaries (diff stats)
   const summaries = await getFileSummaries(cwd, allFiles);
 
-  // 5. Get recent commits for style reference
+  // 5. Analyze patterns BEFORE LLM (pre-processing)
+  const patternAnalysis = analyzePatterns(summaries);
+
+  // Track pattern detection
+  if (patternAnalysis.confidence > 0.7) {
+    await analytics.track('commit.pattern-detected', {
+      patternType: patternAnalysis.patternType,
+      confidence: patternAnalysis.confidence,
+      suggestedType: patternAnalysis.suggestedType,
+      fileCount: summaries.length,
+      hints: patternAnalysis.hints,
+    });
+
+    // Log pattern detection for debugging
+    await logger.debug(`Pattern detected: ${patternAnalysis.patternType} (confidence: ${patternAnalysis.confidence.toFixed(2)})`, {
+      suggestedType: patternAnalysis.suggestedType,
+      hints: patternAnalysis.hints,
+    });
+  }
+
+  // 6. Get recent commits for style reference
   const recentCommits = options.recentCommits ?? await getRecentCommits(cwd, 10);
 
-  // 6. Generate plan using LLM (two-phase) or heuristics
+  // 7. Generate plan using LLM (two-phase) or heuristics
   let commits: CommitGroup[];
   let llmUsed = false;
   let tokensUsed: number | undefined;
@@ -94,8 +119,8 @@ export async function generateCommitPlan(options: GenerateOptions): Promise<Comm
 
   if (llmComplete) {
     try {
-      // Phase 1: Generate with file summaries only (with retry)
-      const prompt = buildPrompt(summaries, recentCommits);
+      // Phase 1: Generate with file summaries and pattern hints (with retry)
+      const prompt = buildEnhancedPrompt(summaries, patternAnalysis, recentCommits);
       const result = await retryLLMCall(
         () => llmComplete(prompt, {
           systemPrompt: SYSTEM_PROMPT,
@@ -107,7 +132,7 @@ export async function generateCommitPlan(options: GenerateOptions): Promise<Comm
         onProgress
       );
 
-      let parsed = parseResponse(result.content, summaries);
+      let parsed = parseResponse(result.content, summaries, patternAnalysis);
       llmUsed = true;
       tokensUsed = result.tokensUsed;
 
@@ -148,15 +173,16 @@ export async function generateCommitPlan(options: GenerateOptions): Promise<Comm
         }
 
         if (diffs.size > 0) {
-          await logger.debug('Re-analyzing with diff context (Phase 2)', {
-            filesWithDiff: filesToDiff.length,
-          });
-          onProgress?.('Re-analyzing with diff context (Phase 2)...');
-
           // Phase 2: Re-generate with diff context (with retry)
           // Scale maxTokens with file count: more files = more commits = more tokens needed
           const maxTokensPhase2 = Math.min(6000, 3000 + Math.floor(summaries.length / 20) * 500);
           const promptWithDiff = buildPromptWithDiff(summaries, diffs, recentCommits);
+
+          await logger.debug('Re-analyzing with diff context (Phase 2)', {
+            filesWithDiff: filesToDiff.length,
+            promptPreview: promptWithDiff.substring(0, 500),
+          });
+          onProgress?.('Re-analyzing with diff context (Phase 2)...');
           const resultWithDiff = await retryLLMCall(
             () => llmComplete(promptWithDiff, {
               systemPrompt: SYSTEM_PROMPT_WITH_DIFF,
@@ -168,7 +194,7 @@ export async function generateCommitPlan(options: GenerateOptions): Promise<Comm
             onProgress
           );
 
-          parsed = parseResponse(resultWithDiff.content, summaries);
+          parsed = parseResponse(resultWithDiff.content, summaries, patternAnalysis);
           tokensUsed = (tokensUsed ?? 0) + (resultWithDiff.tokensUsed ?? 0);
           escalated = true;
         }
@@ -190,7 +216,24 @@ export async function generateCommitPlan(options: GenerateOptions): Promise<Comm
     commits = generateHeuristicPlan(summaries);
   }
 
-  // 6. Build final plan
+  // 6. Track analytics
+  const typeDistribution = commits.reduce((acc, commit) => {
+    acc[commit.type] = (acc[commit.type] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  await analytics.track('commit.generation-complete', {
+    totalFiles: summaries.length,
+    totalCommits: commits.length,
+    llmUsed,
+    escalated,
+    tokensUsed,
+    durationMs: Date.now() - startTime,
+    typeDistribution,
+    scope: scope || 'all',
+  });
+
+  // 7. Build final plan
   return {
     schemaVersion: '1.0',
     createdAt: new Date().toISOString(),
@@ -263,8 +306,9 @@ export interface ValidationResult {
 /**
  * Anti-hallucination validation: ensure LLM output matches reality
  * 1. Remove hallucinated files (files that don't exist in git status)
- * 2. Add missing files that LLM forgot
- * 3. Track warnings for debugging
+ * 2. Remove duplicate files (file appears in multiple commits)
+ * 3. Add missing files that LLM forgot
+ * 4. Track warnings for debugging
  */
 function validateAndFixCommits(
   commits: CommitGroup[],
@@ -287,9 +331,38 @@ function validateAndFixCommits(
   }
 
   // Step 2: Remove empty commits (all files were hallucinated)
-  const nonEmptyCommits = commits.filter((c) => c.files.length > 0);
+  let nonEmptyCommits = commits.filter((c) => c.files.length > 0);
 
-  // Step 3: Find missing files and add them
+  // Step 3: Remove duplicate files - keep only first occurrence
+  const logger = useLogger();
+  const seenFiles = new Set<string>();
+  const duplicates: Array<{ file: string; commit: string }> = [];
+
+  for (const commit of nonEmptyCommits) {
+    const uniqueFiles: string[] = [];
+    for (const file of commit.files) {
+      if (!seenFiles.has(file)) {
+        uniqueFiles.push(file);
+        seenFiles.add(file);
+      } else {
+        duplicates.push({ file, commit: commit.id });
+      }
+    }
+    commit.files = uniqueFiles;
+  }
+
+  // Log duplicates for debugging LLM behavior
+  if (duplicates.length > 0) {
+    logger.warn(`LLM returned ${duplicates.length} duplicate file(s) across commits - removed duplicates`, {
+      duplicateCount: duplicates.length,
+      samples: duplicates.slice(0, 5).map(d => `${d.file} in ${d.commit}`),
+    });
+  }
+
+  // Step 4: Remove commits that became empty after deduplication
+  nonEmptyCommits = nonEmptyCommits.filter((c) => c.files.length > 0);
+
+  // Step 5: Find missing files and add them
   const allFilesInCommits = new Set(nonEmptyCommits.flatMap((c) => c.files));
   const missingFiles = summaries
     .map((s) => s.path)
@@ -336,21 +409,72 @@ async function retryLLMCall(
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
 
+      // Extract error type for better user feedback
+      const errorType = getErrorType(lastError);
+
       if (attempt < MAX_LLM_RETRIES) {
-        await logger.warn(`${phase} failed (attempt ${attempt}/${MAX_LLM_RETRIES}), retrying...`, {
-          error: lastError.message,
+        // Log to file with full details
+        await logger.warn(`${phase} failed (attempt ${attempt}/${MAX_LLM_RETRIES}): ${errorType}`, {
+          errorMessage: lastError.message,
+          errorType,
           attempt,
+          stack: lastError.stack?.split('\n').slice(0, 3).join('\n'), // First 3 lines only
         });
-        onProgress?.(`${phase} error, retrying (${attempt}/${MAX_LLM_RETRIES})...`);
+
+        // Show concise user message
+        onProgress?.(`${phase} ${errorType}, retrying (${attempt}/${MAX_LLM_RETRIES})...`);
 
         // Short delay before retry (exponential backoff: 1s, 2s, 4s...)
         await new Promise((resolve) => setTimeout(resolve, 1000 * Math.pow(2, attempt - 1)));
       } else {
-        await logger.error(`${phase} failed after ${MAX_LLM_RETRIES} attempts: ${lastError.message}`);
+        await logger.error(`${phase} failed after ${MAX_LLM_RETRIES} attempts: ${errorType}`, lastError, {
+          errorType,
+        });
       }
     }
   }
 
   // All retries exhausted
   throw lastError || new Error(`${phase} failed after ${MAX_LLM_RETRIES} attempts`);
+}
+
+/**
+ * Extract user-friendly error type from error message
+ */
+function getErrorType(error: Error): string {
+  const message = error.message.toLowerCase();
+
+  // Rate limiting
+  if (message.includes('429') || message.includes('rate limit') || message.includes('too many requests')) {
+    return 'rate limited (429)';
+  }
+
+  // Server errors
+  if (message.includes('500') || message.includes('502') || message.includes('503')) {
+    return 'server error (5xx)';
+  }
+
+  // Timeout
+  if (message.includes('timeout') || message.includes('timed out')) {
+    return 'timeout';
+  }
+
+  // Network errors
+  if (message.includes('network') || message.includes('econnrefused') || message.includes('enotfound')) {
+    return 'network error';
+  }
+
+  // Parse errors (invalid JSON from LLM)
+  if (message.includes('json') || message.includes('parse') || message.includes('unexpected token')) {
+    return 'invalid JSON';
+  }
+
+  // LLM response validation errors
+  if (message.includes('missing') || message.includes('missing required field')) {
+    return 'invalid structure';
+  }
+
+  // Generic - include first 50 chars of error for debugging
+  const preview = error.message.substring(0, 50).replace(/\n/g, ' ');
+  return `error: ${preview}${error.message.length > 50 ? '...' : ''}`;
 }

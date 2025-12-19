@@ -14,5 +14,6 @@ export {
   clearPlan,
   saveToHistory,
   listHistory,
+  cleanOldHistory,
   initStorage,
 } from './plan-storage';

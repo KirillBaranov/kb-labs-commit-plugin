@@ -15,6 +15,7 @@ const HISTORY_DIR = 'history';
 const PLAN_FILE = 'plan.json';
 const STATUS_FILE = 'status.json';
 const RESULT_FILE = 'result.json';
+const MAX_HISTORY_ENTRIES = 30; // Keep last 30 history entries
 
 /**
  * Get path to commit storage directory
@@ -144,6 +145,9 @@ export async function saveToHistory(
 
   await writeFile(join(historyDir, PLAN_FILE), JSON.stringify(plan, null, 2));
   await writeFile(join(historyDir, RESULT_FILE), JSON.stringify(result, null, 2));
+
+  // Clean old history entries after saving new one
+  await cleanOldHistory(cwd);
 }
 
 /**
@@ -166,6 +170,29 @@ export async function listHistory(
       .sort((a, b) => b.timestamp.localeCompare(a.timestamp)); // Newest first
   } catch {
     return [];
+  }
+}
+
+/**
+ * Clean old history entries, keeping only the most recent N entries
+ */
+export async function cleanOldHistory(
+  cwd: string,
+  maxEntries: number = MAX_HISTORY_ENTRIES
+): Promise<void> {
+  const entries = await listHistory(cwd);
+
+  // If we have more entries than the limit, delete the oldest ones
+  if (entries.length > maxEntries) {
+    const toDelete = entries.slice(maxEntries); // Keep first N (newest), delete rest
+
+    for (const entry of toDelete) {
+      try {
+        await rm(entry.path, { recursive: true, force: true });
+      } catch {
+        // Ignore errors if directory doesn't exist or can't be deleted
+      }
+    }
   }
 }
 

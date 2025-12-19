@@ -75,6 +75,9 @@ importers:
 
   packages/commit-contracts:
     dependencies:
+      '@kb-labs/sdk':
+        specifier: link:../../../kb-labs-sdk/packages/sdk
+        version: link:../../../kb-labs-sdk/packages/sdk
       zod:
         specifier: ^3.23.8
         version: 3.25.76

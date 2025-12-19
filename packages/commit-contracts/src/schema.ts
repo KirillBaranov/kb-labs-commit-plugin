@@ -52,6 +52,8 @@ export const FileSummarySchema = z.object({
   additions: z.number().int().min(0),
   deletions: z.number().int().min(0),
   binary: z.boolean().default(false),
+  /** Whether file is truly new (never existed in repo history) */
+  isNewFile: z.boolean().default(false),
 });
 
 export type FileSummary = z.infer<typeof FileSummarySchema>;

@@ -23,7 +23,6 @@ export type {
   LLMConfig,
   StorageConfig,
   GitConfig,
-  CommitEnv,
   CommitEnvVar,
 } from './types/config';
 export { defaultCommitConfig, resolveCommitConfig, COMMIT_ENV_VARS } from './types/config';

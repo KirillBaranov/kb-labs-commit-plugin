@@ -132,71 +132,39 @@ export const defaultCommitConfig: CommitPluginConfig = {
 };
 
 /**
- * Environment variables interface (from ctx.env)
- */
-export interface CommitEnv {
-  KB_COMMIT_LLM_ENABLED?: string;
-  KB_COMMIT_LLM_TEMPERATURE?: string;
-  KB_COMMIT_LLM_MAX_TOKENS?: string;
-  KB_COMMIT_STORAGE_DIR?: string;
-  KB_COMMIT_AUTO_STAGE?: string;
-}
-
-/**
  * Resolve config with env variable overrides
  *
  * @param fileConfig - Config from kb.config.json (via useConfig)
- * @param env - Environment variables (from ctx.env)
+ * @param env - Environment variables (from commitEnv.parse(runtime))
  */
 export function resolveCommitConfig(
   fileConfig: Partial<CommitPluginConfig> = {},
-  env: CommitEnv = {}
+  env: Partial<{
+    KB_COMMIT_LLM_ENABLED: boolean;
+    KB_COMMIT_LLM_TEMPERATURE: number;
+    KB_COMMIT_LLM_MAX_TOKENS: number;
+    KB_COMMIT_STORAGE_DIR: string;
+    KB_COMMIT_AUTO_STAGE: boolean;
+  }> = {}
 ): CommitPluginConfig {
   const config: CommitPluginConfig = {
     enabled: fileConfig.enabled ?? defaultCommitConfig.enabled,
     llm: {
-      enabled: fileConfig.llm?.enabled ?? defaultCommitConfig.llm.enabled,
-      temperature: fileConfig.llm?.temperature ?? defaultCommitConfig.llm.temperature,
-      maxTokens: fileConfig.llm?.maxTokens ?? defaultCommitConfig.llm.maxTokens,
+      enabled: env.KB_COMMIT_LLM_ENABLED ?? fileConfig.llm?.enabled ?? defaultCommitConfig.llm.enabled,
+      temperature: env.KB_COMMIT_LLM_TEMPERATURE ?? fileConfig.llm?.temperature ?? defaultCommitConfig.llm.temperature,
+      maxTokens: env.KB_COMMIT_LLM_MAX_TOKENS ?? fileConfig.llm?.maxTokens ?? defaultCommitConfig.llm.maxTokens,
     },
     storage: {
-      directory: fileConfig.storage?.directory ?? defaultCommitConfig.storage.directory,
+      directory: env.KB_COMMIT_STORAGE_DIR ?? fileConfig.storage?.directory ?? defaultCommitConfig.storage.directory,
     },
     git: {
       protectedBranches: fileConfig.git?.protectedBranches ?? defaultCommitConfig.git.protectedBranches,
-      autoStage: fileConfig.git?.autoStage ?? defaultCommitConfig.git.autoStage,
+      autoStage: env.KB_COMMIT_AUTO_STAGE ?? fileConfig.git?.autoStage ?? defaultCommitConfig.git.autoStage,
     },
     scope: {
       default: fileConfig.scope?.default ?? defaultCommitConfig.scope?.default,
     },
   };
-
-  // Environment variable overrides (highest priority)
-  if (env.KB_COMMIT_LLM_ENABLED !== undefined) {
-    config.llm.enabled = env.KB_COMMIT_LLM_ENABLED === 'true';
-  }
-
-  if (env.KB_COMMIT_LLM_TEMPERATURE !== undefined) {
-    const temp = parseFloat(env.KB_COMMIT_LLM_TEMPERATURE);
-    if (!isNaN(temp) && temp >= 0 && temp <= 1) {
-      config.llm.temperature = temp;
-    }
-  }
-
-  if (env.KB_COMMIT_LLM_MAX_TOKENS !== undefined) {
-    const tokens = parseInt(env.KB_COMMIT_LLM_MAX_TOKENS, 10);
-    if (!isNaN(tokens) && tokens > 0) {
-      config.llm.maxTokens = tokens;
-    }
-  }
-
-  if (env.KB_COMMIT_STORAGE_DIR) {
-    config.storage.directory = env.KB_COMMIT_STORAGE_DIR;
-  }
-
-  if (env.KB_COMMIT_AUTO_STAGE !== undefined) {
-    config.git.autoStage = env.KB_COMMIT_AUTO_STAGE === 'true';
-  }
 
   return config;
 }

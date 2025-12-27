@@ -10,8 +10,13 @@
  * - All imports from @kb-labs/sdk
  */
 
-import { permissions, defineCommandFlags } from '@kb-labs/sdk';
-import { pluginContractsManifest, COMMIT_ENV_VARS } from '@kb-labs/commit-contracts';
+import {
+  defineCommandFlags,
+  combinePermissions,
+  gitWorkflowPreset,
+  kbPlatformPreset,
+} from '@kb-labs/sdk';
+import { COMMIT_ENV_VARS } from '@kb-labs/commit-contracts';
 import {
   runFlags,
   generateFlags,
@@ -20,6 +25,28 @@ import {
   jsonOnlyFlags,
   emptyFlags,
 } from './cli/commands/flags';
+
+/**
+ * Build permissions using presets:
+ * - gitWorkflow: HOME, USER, GIT_*, SSH_* for git operations
+ * - kbPlatform: KB_* env vars and .kb/ directory
+ * - Custom: COMMIT_ENV_VARS, quotas
+ *
+ * Note: LLM access goes through platform services, no direct API keys needed.
+ */
+const pluginPermissions = combinePermissions()
+  .with(gitWorkflowPreset)
+  .with(kbPlatformPreset)
+  .withEnv([...COMMIT_ENV_VARS])
+  .withFs({
+    mode: 'readWrite',
+    allow: ['.kb/commit/**'],
+  })
+  .withQuotas({
+    timeoutMs: 600000, // 10 min for LLM
+    memoryMb: 512,
+  })
+  .build();
 
 export const manifest = {
   schema: 'kb.plugin/3',
@@ -177,25 +204,8 @@ export const manifest = {
 
   capabilities: [],
 
-  // ✅ V3: Manifest-first permissions (set once for entire plugin)
-  permissions: permissions.combine(
-    permissions.presets.pluginWorkspace('commit'),
-    permissions.presets.llmApi(['openai', 'anthropic']),
-    {
-      fs: {
-        mode: 'readWrite',
-        allow: ['.git/**'], // Git access for commit operations
-      },
-      env: {
-        allow: [...COMMIT_ENV_VARS], // Environment variable overrides
-      },
-      quotas: {
-        timeoutMs: 600000, // 10 min for LLM (generation can take time with large diffs)
-        memoryMb: 512,
-        cpuMs: 30000,
-      },
-    }
-  ),
+  // ✅ V3: Manifest-first permissions using composable presets
+  permissions: pluginPermissions,
 
   // Artifacts
   artifacts: [

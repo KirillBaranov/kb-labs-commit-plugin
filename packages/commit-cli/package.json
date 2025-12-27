@@ -42,8 +42,7 @@
   "dependencies": {
     "@kb-labs/commit-contracts": "workspace:*",
     "@kb-labs/commit-core": "workspace:*",
-    "@kb-labs/sdk": "link:../../../kb-labs-sdk/packages/sdk",
-    "chalk": "^5.6.2"
+    "@kb-labs/sdk": "link:../../../kb-labs-sdk/packages/sdk"
   },
   "devDependencies": {
     "@kb-labs/devkit": "link:../../../kb-labs-devkit",

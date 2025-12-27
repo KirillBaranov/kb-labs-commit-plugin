@@ -53,8 +53,7 @@
     "@kb-labs/sdk": "link:../../../kb-labs-sdk/packages/sdk",
     "globby": "^14.1.0",
     "minimatch": "^10.0.1",
-    "simple-git": "^3.25.0",
-    "zod": "^3.23.8"
+    "simple-git": "^3.25.0"
   },
   "devDependencies": {
     "@kb-labs/devkit": "link:../../../kb-labs-devkit",

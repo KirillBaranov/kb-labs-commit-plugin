@@ -63,6 +63,24 @@ export type FileSummary = z.infer<typeof FileSummarySchema>;
 // ============================================================================
 
 /**
+ * Reasoning for commit type classification
+ */
+export const CommitReasoningSchema = z.object({
+  /** Does this change add NEW user-visible behavior? */
+  newBehavior: z.boolean(),
+  /** Does this change fix BROKEN functionality? */
+  fixesBug: z.boolean(),
+  /** Is this only INTERNAL restructuring? */
+  internalOnly: z.boolean(),
+  /** Human-readable explanation of why this type was chosen */
+  explanation: z.string(),
+  /** LLM confidence in this classification (0.0-1.0) */
+  confidence: z.number().min(0).max(1),
+});
+
+export type CommitReasoning = z.infer<typeof CommitReasoningSchema>;
+
+/**
  * A single commit group in the plan
  */
 export const CommitGroupSchema = z.object({
@@ -74,6 +92,8 @@ export const CommitGroupSchema = z.object({
   files: z.array(z.string()).min(1),
   releaseHint: ReleaseHintSchema.default('none'),
   breaking: z.boolean().default(false),
+  /** Reasoning for commit type classification (optional, added by LLM) */
+  reasoning: CommitReasoningSchema.optional(),
 });
 
 export type CommitGroup = z.infer<typeof CommitGroupSchema>;

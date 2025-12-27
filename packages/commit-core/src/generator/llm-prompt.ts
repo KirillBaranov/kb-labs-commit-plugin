@@ -2,7 +2,7 @@
  * LLM prompt building and response parsing
  */
 
-import type { FileSummary, CommitGroup, ConventionalType } from '@kb-labs/commit-contracts';
+import type { FileSummary, CommitGroup, ConventionalType, CommitReasoning } from '@kb-labs/commit-contracts';
 import type { PatternAnalysis } from './pattern-detector';
 
 /**
@@ -26,18 +26,71 @@ CRITICAL GROUPING RULES:
 - Ask yourself: "Would a developer make these changes in separate commits?" If no, group them!
 - CRITICAL: Each file must appear in EXACTLY ONE commit - no duplicates across commits!
 
+CRITICAL COMMIT TYPE CLASSIFICATION:
+For EACH commit, you MUST answer these questions to determine the correct type:
+
+1. Does this change add NEW USER-VISIBLE BEHAVIOR? (yes/no)
+   - Can users/developers do something they couldn't before?
+   - Is there a new API, feature, or capability?
+   → YES = likely feat
+
+2. Does this change fix BROKEN functionality? (yes/no)
+   - Was something not working correctly?
+   - Is this correcting a bug or error?
+   → YES = fix
+
+3. Is this ONLY INTERNAL restructuring? (yes/no)
+   - Code reorganization, renaming, extracting functions?
+   - Improving structure WITHOUT changing behavior?
+   - Modified files with balanced additions/deletions?
+   → YES = refactor
+
+4. Is this configuration, build, or maintenance work? (yes/no)
+   - Dependencies, build configs, tooling?
+   - No code logic changes?
+   → YES = chore
+
+DEFAULT BIAS: When uncertain between feat and refactor, choose refactor!
+
 Rules:
 1. Use conventional commits: feat, fix, refactor, chore, docs, test, build, ci, perf
 2. Group related files - number of commits should scale with file count (see grouping rules above)
-3. Each commit must include releaseHint: none, patch, minor, or major
+3. Each commit MUST include "reasoning" field explaining your classification
 4. Message should be lowercase, imperative mood, no period at end
 5. breaking: true only for breaking API changes
 6. For commits with 2+ files, add "body" with bullet points listing affected files/changes
-7. Set confidence 0.0-1.0 for each commit (how sure you are about type/message)
-8. If ANY commit has confidence < 0.7, set needsMoreContext: true
-9. Scope should reflect the affected area (e.g., "cli", "api"), not individual files
-10. CRITICAL: If ALL files in a commit have status "deleted", use type "chore" or "refactor", NOT "feat"
-11. CRITICAL: If a commit is mostly deletions (>80% deletions), use "refactor" or "chore", NOT "feat"
+7. Scope should reflect the affected area (e.g., "cli", "api"), not individual files
+8. CRITICAL: If ALL files in a commit have status "deleted", use type "chore" or "refactor", NOT "feat"
+9. CRITICAL: If a commit is mostly deletions (>80% deletions), use "refactor" or "chore", NOT "feat"
+10. CRITICAL: IsNewFile flag determines STRONG BIAS against feat:
+
+    IsNewFile: FALSE (modified existing file):
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    → DEFAULT to refactor/fix/chore (NOT feat!)
+    → Only use feat if adds MAJOR new user-facing capability
+
+    Common cases where IsNewFile: false = NOT feat:
+    ✅ Changed dependencies/imports → chore
+    ✅ Added method to existing class → refactor
+    ✅ Updated implementation logic → refactor
+    ✅ Fixed bug in existing code → fix
+    ✅ Renamed/moved code → refactor
+    ✅ Modified config files → chore
+
+    ❌ WRONG: IsNewFile: false, minor additions → feat
+    ✅ RIGHT: IsNewFile: false, minor additions → refactor
+
+
+    IsNewFile: TRUE (brand new file):
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    → Might be feat IF adds new user capability
+    → If only config/tooling/internal → chore
+
+    Examples:
+    ✅ New API endpoint file → feat
+    ✅ New CLI command file → feat
+    ✅ New config file → chore
+    ✅ New test file → test
 
 EXACT JSON SCHEMA (copy this structure):
 {
@@ -53,7 +106,13 @@ EXACT JSON SCHEMA (copy this structure):
       "files": ["file1.ts", "file2.ts", "file3.ts"],
       "releaseHint": "minor",
       "breaking": false,
-      "confidence": 0.8
+      "reasoning": {
+        "newBehavior": true,
+        "fixesBug": false,
+        "internalOnly": false,
+        "explanation": "Adds new authentication capability that users can configure",
+        "confidence": 0.85
+      }
     }
   ]
 }
@@ -75,7 +134,13 @@ EXAMPLE OUTPUT (use this as template):
       "files": ["src/commands/generate.ts", "src/llm.ts"],
       "releaseHint": "minor",
       "breaking": false,
-      "confidence": 0.9
+      "reasoning": {
+        "newBehavior": true,
+        "fixesBug": false,
+        "internalOnly": false,
+        "explanation": "New command allows users to generate commits with LLM - new capability",
+        "confidence": 0.9
+      }
     },
     {
       "id": "c2",
@@ -84,7 +149,13 @@ EXAMPLE OUTPUT (use this as template):
       "files": ["tests/generate.test.ts"],
       "releaseHint": "none",
       "breaking": false,
-      "confidence": 0.85
+      "reasoning": {
+        "newBehavior": false,
+        "fixesBug": false,
+        "internalOnly": true,
+        "explanation": "Test coverage for new feature - internal quality improvement",
+        "confidence": 0.85
+      }
     }
   ]
 }
@@ -165,31 +236,86 @@ CRITICAL GROUPING RULES:
 - Only separate genuinely DIFFERENT changes
 - CRITICAL: Each file must appear in EXACTLY ONE commit - no duplicates across commits!
 
+CRITICAL COMMIT TYPE CLASSIFICATION (same as Phase 1):
+For EACH commit, answer these questions using the DIFF content:
+
+1. Does this change add NEW USER-VISIBLE BEHAVIOR?
+   - Look at the diff: is there a new API, feature, or capability?
+   - Check IsNewFile: false = likely refactor, true = might be feat
+   → YES = feat
+
+2. Does this change fix BROKEN functionality?
+   - Look for bug fixes, error handling corrections
+   → YES = fix
+
+3. Is this ONLY INTERNAL restructuring?
+   - Renaming, extracting functions, reorganizing code?
+   - IsNewFile: false with balanced +/- = refactor
+   → YES = refactor
+
+DEFAULT BIAS: When uncertain between feat and refactor, choose refactor!
+
 Rules:
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!! RULE 0 (HIGHEST PRIORITY - OVERRIDES ALL OTHER RULES):                    !!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!
+!!! IF a file has "IsNewFile: false" in its metadata, IT IS A MODIFIED FILE.
+!!! Modified files CANNOT be feat UNLESS they add ENTIRELY NEW user-facing APIs.
+!!!
+!!! BEFORE classifying ANY commit as "feat", CHECK ALL files' IsNewFile flags:
+!!! - If ANY file has IsNewFile: false → START with refactor/fix/chore
+!!! - If ALL files have IsNewFile: true → MIGHT be feat (check diff content)
+!!!
+!!! EXAMPLES OF MODIFIED FILES (IsNewFile: false) → NOT FEAT:
+!!! ❌ WRONG: Modified file adds new function → feat
+!!! ✅ RIGHT: Modified file adds new function → refactor
+!!!
+!!! ❌ WRONG: Modified file adds new class → feat
+!!! ✅ RIGHT: Modified file adds new class → refactor
+!!!
+!!! ❌ WRONG: Modified file adds new CLI command → feat
+!!! ✅ RIGHT: Modified file adds new CLI command → refactor
+!!!
+!!! ONLY USE FEAT for modified files if:
+!!! - Diff shows COMPLETELY NEW public API endpoint (e.g., POST /api/new-resource)
+!!! - Diff shows COMPLETELY NEW product feature visible to end users
+!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 1. Use conventional commits: feat, fix, refactor, chore, docs, test, build, ci, perf
 2. Group related files - number of commits should scale with file count (see grouping rules above)
-3. Each commit must include releaseHint: none, patch, minor, or major
+3. Each commit MUST include "reasoning" field based on actual diff content
 4. Message should be lowercase, imperative mood, no period at end
 5. breaking: true only for breaking API changes
 6. Add "body" with bullet points explaining the actual changes you see in the diff
 7. Scope should reflect the affected area (e.g., "cli", "api"), not individual files
 8. CRITICAL: If ALL files in a commit are being DELETED (only deletions in diff), use type "chore" or "refactor", NOT "feat"
 9. CRITICAL: If a commit is mostly deletions (>80% of lines are deletions), use "refactor" or "chore", NOT "feat"
-10. CRITICAL: Check IsNewFile flag FIRST - if false, default to refactor/fix/chore unless diff shows truly new functionality
+10. IsNewFile flag (see RULE 0 above for detailed logic):
+    - IsNewFile: false → refactor/fix/chore (NOT feat)
+    - IsNewFile: true → might be feat (check diff)
 
 EXACT JSON SCHEMA (copy this structure):
 {
   "commits": [
     {
       "id": "c1",
-      "type": "feat",
+      "type": "refactor",
       "scope": "area-scope",
       "message": "short description based on actual changes",
       "body": "- what changed\\n- why it changed",
       "files": ["file1.ts", "file2.ts", "file3.ts"],
-      "releaseHint": "minor",
+      "releaseHint": "patch",
       "breaking": false,
-      "confidence": 0.95
+      "reasoning": {
+        "newBehavior": false,
+        "fixesBug": false,
+        "internalOnly": true,
+        "explanation": "Diff shows function extraction and renaming - internal restructuring without behavior change",
+        "confidence": 0.95
+      }
     }
   ]
 }
@@ -209,7 +335,13 @@ EXAMPLE OUTPUT (based on actual diff content):
       "files": ["src/commands/routing.ts", "src/plugins/discovery.ts", "src/__tests__/routing.test.ts"],
       "releaseHint": "patch",
       "breaking": false,
-      "confidence": 0.95
+      "reasoning": {
+        "newBehavior": false,
+        "fixesBug": false,
+        "internalOnly": true,
+        "explanation": "IsNewFile: false for all files. Diff shows code extraction and reorganization - no new user-facing behavior",
+        "confidence": 0.95
+      }
     }
   ]
 }
@@ -251,7 +383,8 @@ export function buildPrompt(
   const fileList = summaries
     .map((s) => {
       const stats = s.binary ? 'binary' : `+${s.additions}/-${s.deletions}`;
-      return `- ${s.path} (${s.status}, ${stats})`;
+      const isNew = s.isNewFile ? 'IsNewFile: true' : 'IsNewFile: false';
+      return `- ${s.path} (${s.status}, ${stats}, ${isNew})`;
     })
     .join('\n');
 
@@ -277,7 +410,8 @@ export function buildEnhancedPrompt(
   const fileList = summaries
     .map((s) => {
       const stats = s.binary ? 'binary' : `+${s.additions}/-${s.deletions}`;
-      return `- ${s.path} (${s.status}, ${stats})`;
+      const isNew = s.isNewFile ? 'IsNewFile: true' : 'IsNewFile: false';
+      return `- ${s.path} (${s.status}, ${stats}, ${isNew})`;
     })
     .join('\n');
 
@@ -453,6 +587,27 @@ export function parseResponse(
     const type = normalizeType(commit.type as string);
     const files = commit.files as string[];
 
+    // Parse reasoning if present
+    const reasoning = commit.reasoning as Record<string, unknown> | undefined;
+    let parsedReasoning: CommitReasoning | undefined;
+    let confidence = 0.5; // default
+
+    if (reasoning && typeof reasoning === 'object') {
+      // Extract confidence from reasoning if present
+      confidence = typeof reasoning.confidence === 'number' ? reasoning.confidence : 0.5;
+
+      parsedReasoning = {
+        newBehavior: Boolean(reasoning.newBehavior),
+        fixesBug: Boolean(reasoning.fixesBug),
+        internalOnly: Boolean(reasoning.internalOnly),
+        explanation: typeof reasoning.explanation === 'string' ? reasoning.explanation : 'No explanation provided',
+        confidence,
+      };
+    } else {
+      // Fallback to old confidence field if no reasoning
+      confidence = typeof commit.confidence === 'number' ? commit.confidence : 0.5;
+    }
+
     return {
       id: (commit.id as string) || `c${index + 1}`,
       type,
@@ -462,7 +617,8 @@ export function parseResponse(
       files,
       releaseHint: normalizeReleaseHint(commit.releaseHint as string),
       breaking: Boolean(commit.breaking),
-      confidence: typeof commit.confidence === 'number' ? commit.confidence : 0.5,
+      reasoning: parsedReasoning,
+      confidence, // keep for internal use
     } satisfies CommitGroup & { confidence: number };
   });
 
@@ -505,6 +661,48 @@ function fixCommitType<T extends CommitGroup & { confidence: number }>(
 
   if (commitSummaries.length === 0) {
     return commit; // No summaries, can't validate
+  }
+
+  // Rule 0: Conservative Bias - use reasoning to validate commit type
+  // If LLM has low confidence (<0.7) and says feat, double-check with reasoning
+  if (commit.type === 'feat' && commit.confidence < 0.7 && commit.reasoning) {
+    const { newBehavior, internalOnly, fixesBug } = commit.reasoning;
+
+    // If reasoning says "internalOnly" but type is "feat" → downgrade to refactor
+    if (internalOnly && !newBehavior) {
+      return {
+        ...commit,
+        type: 'refactor' as ConventionalType,
+        reasoning: {
+          ...commit.reasoning,
+          explanation: `[Conservative bias] ${commit.reasoning.explanation}. Low confidence + internalOnly → refactor`,
+        },
+      };
+    }
+
+    // If reasoning says it fixes a bug but type is "feat" → change to fix
+    if (fixesBug && !newBehavior) {
+      return {
+        ...commit,
+        type: 'fix' as ConventionalType,
+        reasoning: {
+          ...commit.reasoning,
+          explanation: `[Conservative bias] ${commit.reasoning.explanation}. Fixes bug → fix`,
+        },
+      };
+    }
+
+    // If newBehavior is false but type is feat → downgrade to refactor
+    if (!newBehavior) {
+      return {
+        ...commit,
+        type: 'refactor' as ConventionalType,
+        reasoning: {
+          ...commit.reasoning,
+          explanation: `[Conservative bias] ${commit.reasoning.explanation}. No new behavior → refactor`,
+        },
+      };
+    }
   }
 
   // Rule 1: If ALL files are deleted, this is NOT a feat

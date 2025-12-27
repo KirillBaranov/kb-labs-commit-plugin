@@ -93,7 +93,7 @@ export async function generateCommitPlan(options: GenerateOptions): Promise<Comm
 
   // Track pattern detection
   if (patternAnalysis.confidence > 0.7) {
-    await analytics.track('commit.pattern-detected', {
+    await analytics?.track('commit.pattern-detected', {
       patternType: patternAnalysis.patternType,
       confidence: patternAnalysis.confidence,
       suggestedType: patternAnalysis.suggestedType,
@@ -136,15 +136,22 @@ export async function generateCommitPlan(options: GenerateOptions): Promise<Comm
       llmUsed = true;
       tokensUsed = result.tokensUsed;
 
-      // Phase 2: Escalate if LLM requests more context or confidence is low
-      if (parsed.needsMoreContext || parsed.averageConfidence < CONFIDENCE_THRESHOLD) {
-        const confidencePercent = (parsed.averageConfidence * 100).toFixed(0);
-        await logger.debug(`LLM confidence ${confidencePercent}%, escalating to Phase 2`, {
+      // Phase 2: Escalate if LLM requests more context, confidence is low, or 10+ files
+      const shouldEscalate = parsed.needsMoreContext
+        || parsed.averageConfidence < CONFIDENCE_THRESHOLD
+        || summaries.length >= 10;
+
+      if (shouldEscalate) {
+        const reason = summaries.length >= 10
+          ? `${summaries.length} files (≥10)`
+          : `confidence ${(parsed.averageConfidence * 100).toFixed(0)}%`;
+        await logger.debug(`Escalating to Phase 2: ${reason}`, {
+          fileCount: summaries.length,
           confidence: parsed.averageConfidence,
           needsMoreContext: parsed.needsMoreContext,
           requestedFiles: parsed.requestedFiles,
         });
-        onProgress?.(`LLM confidence ${confidencePercent}% - fetching diff...`);
+        onProgress?.(`${reason} - fetching diff...`);
 
         // Get diff for requested files (or all files if none specified)
         const filesToDiff = parsed.requestedFiles.length > 0
@@ -222,7 +229,7 @@ export async function generateCommitPlan(options: GenerateOptions): Promise<Comm
     return acc;
   }, {} as Record<string, number>);
 
-  await analytics.track('commit.generation-complete', {
+  await analytics?.track('commit.generation-complete', {
     totalFiles: summaries.length,
     totalCommits: commits.length,
     llmUsed,

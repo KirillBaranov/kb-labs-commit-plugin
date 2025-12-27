@@ -14,6 +14,15 @@ export default defineConfig({
     'src/cli/commands/push.ts',
     'src/cli/commands/open.ts',
     'src/cli/commands/reset.ts',
+    // REST API handlers
+    'src/rest/handlers/workspaces-handler.ts',
+    'src/rest/handlers/status-handler.ts',
+    'src/rest/handlers/generate-handler.ts',
+    'src/rest/handlers/plan-handler.ts',
+    'src/rest/handlers/apply-handler.ts',
+    'src/rest/handlers/push-handler.ts',
+    'src/rest/handlers/reset-handler.ts',
+    'src/rest/handlers/git-status-handler.ts',
   ],
   external: [
     '@kb-labs/sdk',

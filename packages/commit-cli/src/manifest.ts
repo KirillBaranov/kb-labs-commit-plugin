@@ -207,6 +207,239 @@ export const manifest = {
   // ✅ V3: Manifest-first permissions using composable presets
   permissions: pluginPermissions,
 
+  // REST API routes (inherit permissions from manifest)
+  rest: {
+    basePath: '/v1/plugins/commit',
+    routes: [
+    // GET /workspaces
+    {
+      method: 'GET',
+      path: '/workspaces',
+      handler: './rest/handlers/workspaces-handler.js#default',
+      output: {
+        zod: '@kb-labs/commit-contracts#WorkspacesResponseSchema',
+      },
+    },
+    // GET /status
+    {
+      method: 'GET',
+      path: '/status',
+      handler: './rest/handlers/status-handler.js#default',
+      output: {
+        zod: '@kb-labs/commit-contracts#StatusResponseSchema',
+      },
+    },
+    // POST /generate
+    {
+      method: 'POST',
+      path: '/generate',
+      handler: './rest/handlers/generate-handler.js#default',
+      input: {
+        zod: '@kb-labs/commit-contracts#GenerateRequestSchema',
+      },
+      output: {
+        zod: '@kb-labs/commit-contracts#GenerateResponseSchema',
+      },
+    },
+    // GET /plan
+    {
+      method: 'GET',
+      path: '/plan',
+      handler: './rest/handlers/plan-handler.js#default',
+      output: {
+        zod: '@kb-labs/commit-contracts#PlanResponseSchema',
+      },
+    },
+    // POST /apply
+    {
+      method: 'POST',
+      path: '/apply',
+      handler: './rest/handlers/apply-handler.js#default',
+      input: {
+        zod: '@kb-labs/commit-contracts#ApplyRequestSchema',
+      },
+      output: {
+        zod: '@kb-labs/commit-contracts#ApplyResponseSchema',
+      },
+    },
+    // POST /push
+    {
+      method: 'POST',
+      path: '/push',
+      handler: './rest/handlers/push-handler.js#default',
+      input: {
+        zod: '@kb-labs/commit-contracts#PushRequestSchema',
+      },
+      output: {
+        zod: '@kb-labs/commit-contracts#PushResponseSchema',
+      },
+    },
+    // DELETE /plan
+    {
+      method: 'DELETE',
+      path: '/plan',
+      handler: './rest/handlers/reset-handler.js#default',
+      output: {
+        zod: '@kb-labs/commit-contracts#ResetResponseSchema',
+      },
+    },
+    // GET /git-status
+    {
+      method: 'GET',
+      path: '/git-status',
+      handler: './rest/handlers/git-status-handler.js#default',
+      output: {
+        zod: '@kb-labs/commit-contracts#GitStatusResponseSchema',
+      },
+    },
+    ],
+  },
+
+  // Studio UI widgets
+  studio: {
+    widgets: [
+    // Workspace Selector
+    {
+      id: 'commit.workspace-selector',
+      kind: 'select',
+      title: 'Select Workspace',
+      description: 'Choose monorepo package or repository',
+      data: {
+        source: {
+          type: 'rest',
+          routeId: '/v1/plugins/commit/workspaces',
+          method: 'GET',
+        },
+      },
+      options: {
+        searchable: true,
+        placeholder: 'Select workspace...',
+      },
+      events: {
+        emit: ['workspace:changed'],
+      },
+      layoutHint: { w: 6, h: 1, minH: 1 },
+      order: 0,
+    },
+    // Status Metrics
+    {
+      id: 'commit.status',
+      kind: 'metric-group',
+      title: 'Commit Status',
+      description: 'Current plan and git status',
+      data: {
+        source: {
+          type: 'rest',
+          routeId: '/v1/plugins/commit/status',
+          method: 'GET',
+        },
+      },
+      events: {
+        subscribe: ['workspace:changed', 'form:submitted'],
+      },
+      layoutHint: { w: 6, h: 2, minH: 2 },
+      order: 1,
+    },
+    // Plan Viewer
+    {
+      id: 'commit.plan-viewer',
+      kind: 'cardlist',
+      title: 'Commit Plan',
+      description: 'Generated commits',
+      data: {
+        source: {
+          type: 'rest',
+          routeId: '/v1/plugins/commit/plan',
+          method: 'GET',
+        },
+      },
+      options: {
+        layout: 'list',
+        emptyMessage: 'No plan. Click Generate Plan.',
+      },
+      events: {
+        subscribe: ['workspace:changed', 'form:submitted'],
+      },
+      layoutHint: { w: 3, h: 6, minW: 3, minH: 4 },
+      order: 2,
+    },
+    // Git Files Table
+    {
+      id: 'commit.git-files',
+      kind: 'table',
+      title: 'Changed Files',
+      description: 'Files with uncommitted changes',
+      data: {
+        source: {
+          type: 'rest',
+          routeId: '/v1/plugins/commit/git-status',
+          method: 'GET',
+        },
+      },
+      options: {
+        columns: [
+          { key: 'path', label: 'File', sortable: true },
+          { key: 'status', label: 'Status', width: 80 },
+          { key: 'additions', label: '+', width: 60 },
+          { key: 'deletions', label: '-', width: 60 },
+        ],
+        sortable: true,
+        pageSize: 20,
+      },
+      events: {
+        subscribe: ['workspace:changed'],
+      },
+      layoutHint: { w: 3, h: 6, minW: 3 },
+      order: 3,
+    },
+    // Actions
+    {
+      id: 'commit.actions',
+      kind: 'form',
+      title: 'Actions',
+      description: 'Commit operations',
+      actions: [
+        {
+          id: 'generate',
+          label: 'Generate Plan',
+          icon: 'magic',
+          variant: 'primary',
+          endpoint: { type: 'rest', routeId: '/v1/plugins/commit/generate', method: 'POST' },
+        },
+        {
+          id: 'apply',
+          label: 'Apply Commits',
+          icon: 'check',
+          variant: 'success',
+          endpoint: { type: 'rest', routeId: '/v1/plugins/commit/apply', method: 'POST' },
+          confirm: { message: 'Apply commits?' },
+        },
+        {
+          id: 'push',
+          label: 'Push',
+          icon: 'upload',
+          endpoint: { type: 'rest', routeId: '/v1/plugins/commit/push', method: 'POST' },
+          confirm: { message: 'Push to remote?' },
+        },
+        {
+          id: 'reset',
+          label: 'Reset',
+          icon: 'trash',
+          variant: 'danger',
+          endpoint: { type: 'rest', routeId: '/v1/plugins/commit/plan', method: 'DELETE' },
+          confirm: { message: 'Delete plan?' },
+        },
+      ],
+      events: {
+        subscribe: ['workspace:changed'],
+        emit: ['form:submitted'],
+      },
+      layoutHint: { w: 6, h: 1 },
+      order: 4,
+    },
+    ],
+  },
+
   // Artifacts
   artifacts: [
     {

@@ -16,6 +16,7 @@ export { parsePluginContracts, pluginContractsSchema } from './schema/contract.s
 export { contractsSchemaId, contractsVersion } from './version';
 export * from './types';
 export * from './schema';
+export * from './schema/rest.schema';
 export * from './flags';
 export * from './env';
 

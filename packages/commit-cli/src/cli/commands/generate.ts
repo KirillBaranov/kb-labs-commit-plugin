@@ -188,8 +188,12 @@ export default defineCommand({
           items: summaryItems,
         });
 
-        ctx.ui?.success?.('Commit Plan Generated', {
+        const timing = Date.now() - startTime;
+
+        ctx.ui?.success?.('Plan generated and saved', {
+          title: 'Generate Commit Plan',
           sections,
+          timing,
         });
       }
 

@@ -117,13 +117,19 @@ export default defineCommand({
             items: summaryItems,
           });
 
-          ctx.ui?.success?.('Commits Applied', {
+          const timing = Date.now() - startTime;
+
+          ctx.ui?.success?.('Commits applied successfully', {
+            title: 'Apply Commit Plan',
             sections,
+            timing,
           });
         } else {
-          const errorItems = result.errors.map((error) => `❌ ${error}`);
+          const errorItems = result.errors.map((error) => error);
+          const timing = Date.now() - startTime;
 
-          ctx.ui?.error?.('Failed to Apply Commits', {
+          ctx.ui?.error?.('Failed to apply commits', {
+            title: 'Apply Commit Plan',
             sections: [
               {
                 header: 'Summary',
@@ -134,6 +140,7 @@ export default defineCommand({
                 items: errorItems,
               },
             ],
+            timing,
           });
         }
       }

@@ -135,11 +135,15 @@ export default defineCommand({
           summaryItems.push('Generator: Heuristics');
         }
 
-        ctx.ui?.success?.('Commit Plan (Dry Run)', {
+        const timing = Date.now() - startTime;
+
+        ctx.ui?.success?.('Plan generated (no commits created)', {
+          title: 'Git Commit (Dry Run)',
           sections: [
             { header: 'Summary', items: summaryItems },
-            { header: 'Commits', items: commitsItems },
+            { header: 'Planned Commits', items: commitsItems },
           ],
+          timing,
         });
 
         return {
@@ -154,7 +158,7 @@ export default defineCommand({
             })),
           },
           meta: {
-            timing: Date.now() - startTime,
+            timing,
           },
         };
       }
@@ -210,23 +214,14 @@ export default defineCommand({
       if (outputJson) {
         ctx.ui?.json?.(output);
       } else {
-        const colors = ctx.ui?.colors;
-
-        // Header
-        const header = colors?.bold?.('Applied commits:') ?? 'Applied commits:';
-        ctx.ui?.write?.('');
-        ctx.ui?.write?.(header);
-
-        // Commits list
-        for (const c of applyResult.appliedCommits) {
+        // Build commits list items
+        const commitsItems = applyResult.appliedCommits.map((c) => {
           const shortSha = c.sha.substring(0, 7);
           const firstLine = c.message.split('\n')[0];
-          const coloredSha = colors?.muted?.(`[${shortSha}]`) ?? `[${shortSha}]`;
-          ctx.ui?.write?.(`  ${coloredSha} ${firstLine}`);
-        }
-        ctx.ui?.write?.('');
+          return `[${shortSha}] ${firstLine}`;
+        });
 
-        // Summary box with stats
+        // Build summary items
         const summaryItems: string[] = [
           `Commits: ${applyResult.appliedCommits.length}`,
           `Pushed: ${pushed ? 'Yes' : 'No'}`,
@@ -240,8 +235,15 @@ export default defineCommand({
           }
         }
 
-        ctx.ui?.success?.('Done', {
-          sections: [{ header: 'Summary', items: summaryItems }],
+        const timing = Date.now() - startTime;
+
+        ctx.ui?.success?.('Commits created successfully', {
+          title: 'Git Commit',
+          sections: [
+            { header: 'Summary', items: summaryItems },
+            { header: 'Commits Created', items: commitsItems },
+          ],
+          timing,
         });
       }
 

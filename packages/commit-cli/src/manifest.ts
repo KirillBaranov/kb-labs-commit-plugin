@@ -16,7 +16,13 @@ import {
   gitWorkflowPreset,
   kbPlatformPreset,
 } from '@kb-labs/sdk';
-import { COMMIT_ENV_VARS } from '@kb-labs/commit-contracts';
+import {
+  COMMIT_ENV_VARS,
+  COMMIT_BASE_PATH,
+  COMMIT_ROUTES,
+  COMMIT_WIDGET_ROUTES,
+  COMMIT_EVENTS,
+} from '@kb-labs/commit-contracts';
 import {
   runFlags,
   generateFlags,
@@ -209,12 +215,12 @@ export const manifest = {
 
   // REST API routes (inherit permissions from manifest)
   rest: {
-    basePath: '/v1/plugins/commit',
+    basePath: COMMIT_BASE_PATH,
     routes: [
     // GET /workspaces
     {
       method: 'GET',
-      path: '/workspaces',
+      path: COMMIT_ROUTES.WORKSPACES,
       handler: './rest/handlers/workspaces-handler.js#default',
       output: {
         zod: '@kb-labs/commit-contracts#WorkspacesResponseSchema',
@@ -223,7 +229,7 @@ export const manifest = {
     // GET /status
     {
       method: 'GET',
-      path: '/status',
+      path: COMMIT_ROUTES.STATUS,
       handler: './rest/handlers/status-handler.js#default',
       output: {
         zod: '@kb-labs/commit-contracts#StatusResponseSchema',
@@ -232,7 +238,7 @@ export const manifest = {
     // POST /generate
     {
       method: 'POST',
-      path: '/generate',
+      path: COMMIT_ROUTES.GENERATE,
       handler: './rest/handlers/generate-handler.js#default',
       input: {
         zod: '@kb-labs/commit-contracts#GenerateRequestSchema',
@@ -244,7 +250,7 @@ export const manifest = {
     // GET /plan
     {
       method: 'GET',
-      path: '/plan',
+      path: COMMIT_ROUTES.PLAN,
       handler: './rest/handlers/plan-handler.js#default',
       output: {
         zod: '@kb-labs/commit-contracts#PlanResponseSchema',
@@ -253,7 +259,7 @@ export const manifest = {
     // POST /apply
     {
       method: 'POST',
-      path: '/apply',
+      path: COMMIT_ROUTES.APPLY,
       handler: './rest/handlers/apply-handler.js#default',
       input: {
         zod: '@kb-labs/commit-contracts#ApplyRequestSchema',
@@ -265,7 +271,7 @@ export const manifest = {
     // POST /push
     {
       method: 'POST',
-      path: '/push',
+      path: COMMIT_ROUTES.PUSH,
       handler: './rest/handlers/push-handler.js#default',
       input: {
         zod: '@kb-labs/commit-contracts#PushRequestSchema',
@@ -277,7 +283,7 @@ export const manifest = {
     // DELETE /plan
     {
       method: 'DELETE',
-      path: '/plan',
+      path: COMMIT_ROUTES.RESET,
       handler: './rest/handlers/reset-handler.js#default',
       output: {
         zod: '@kb-labs/commit-contracts#ResetResponseSchema',
@@ -286,11 +292,17 @@ export const manifest = {
     // GET /git-status
     {
       method: 'GET',
-      path: '/git-status',
+      path: COMMIT_ROUTES.GIT_STATUS,
       handler: './rest/handlers/git-status-handler.js#default',
       output: {
         zod: '@kb-labs/commit-contracts#GitStatusResponseSchema',
       },
+    },
+    // GET /files
+    {
+      method: 'GET',
+      path: COMMIT_ROUTES.FILES,
+      handler: './rest/handlers/files-handler.js#default',
     },
     ],
   },
@@ -307,7 +319,7 @@ export const manifest = {
       data: {
         source: {
           type: 'rest',
-          routeId: '/v1/plugins/commit/workspaces',
+          routeId: COMMIT_WIDGET_ROUTES.WORKSPACES,
           method: 'GET',
         },
       },
@@ -316,7 +328,10 @@ export const manifest = {
         placeholder: 'Select workspace...',
       },
       events: {
-        emit: ['workspace:changed'],
+        emit: [{
+          name: COMMIT_EVENTS.WORKSPACE_CHANGED,
+          payloadMap: { workspace: 'value' },  // Maps selected value to payload.workspace
+        }],
       },
       layoutHint: { w: 6, h: 1, minH: 1 },
       order: 0,
@@ -330,113 +345,359 @@ export const manifest = {
       data: {
         source: {
           type: 'rest',
-          routeId: '/v1/plugins/commit/status',
+          routeId: COMMIT_WIDGET_ROUTES.STATUS,
           method: 'GET',
         },
       },
       events: {
-        subscribe: ['workspace:changed', 'form:submitted'],
+        subscribe: [
+          {
+            name: COMMIT_EVENTS.WORKSPACE_CHANGED,
+            paramsMap: { workspace: 'workspace' },  // Maps payload.workspace to params.workspace
+          },
+          COMMIT_EVENTS.FORM_SUBMITTED,
+        ],
       },
       layoutHint: { w: 6, h: 2, minH: 2 },
       order: 1,
     },
-    // Plan Viewer
+    // Plan Viewer (child of commit.plan-section)
     {
       id: 'commit.plan-viewer',
       kind: 'cardlist',
-      title: 'Commit Plan',
-      description: 'Generated commits',
+      title: '',  // Title shown in parent section
+      description: '',
       data: {
         source: {
           type: 'rest',
-          routeId: '/v1/plugins/commit/plan',
+          routeId: COMMIT_WIDGET_ROUTES.PLAN,
           method: 'GET',
         },
       },
       options: {
         layout: 'list',
-        emptyMessage: 'No plan. Click Generate Plan.',
+        emptyMessage: 'No plan. Click Generate Plan to create commits.',
       },
       events: {
-        subscribe: ['workspace:changed', 'form:submitted'],
+        subscribe: [
+          {
+            name: COMMIT_EVENTS.WORKSPACE_CHANGED,
+            paramsMap: { workspace: 'workspace' },
+          },
+          COMMIT_EVENTS.FORM_SUBMITTED,
+        ],
       },
-      layoutHint: { w: 3, h: 6, minW: 3, minH: 4 },
       order: 2,
     },
-    // Git Files Table
+    // Git Files Table (child of commit.files-section)
     {
       id: 'commit.git-files',
       kind: 'table',
-      title: 'Changed Files',
-      description: 'Files with uncommitted changes',
+      title: '',  // Title shown in parent section
+      description: '',
       data: {
         source: {
           type: 'rest',
-          routeId: '/v1/plugins/commit/git-status',
+          routeId: COMMIT_WIDGET_ROUTES.FILES,
           method: 'GET',
         },
       },
       options: {
         columns: [
-          { key: 'path', label: 'File', sortable: true },
-          { key: 'status', label: 'Status', width: 80 },
-          { key: 'additions', label: '+', width: 60 },
-          { key: 'deletions', label: '-', width: 60 },
+          {
+            id: 'path',
+            label: 'File',
+            sortable: true,
+            width: '60%',
+          },
+          {
+            id: 'status',
+            label: 'Status',
+            sortable: true,
+            width: 80,
+          },
+          {
+            id: 'changes',
+            label: 'Changes',
+            sortable: false,
+            width: 120,
+          },
         ],
-        sortable: true,
-        pageSize: 20,
+        pagination: false,
+        rowSelection: false,
+        size: 'small',
       },
       events: {
-        subscribe: ['workspace:changed'],
+        subscribe: [{
+          name: COMMIT_EVENTS.WORKSPACE_CHANGED,
+          paramsMap: { workspace: 'workspace' },
+        }],
       },
-      layoutHint: { w: 3, h: 6, minW: 3 },
       order: 3,
     },
-    // Actions
+    // Quick Actions Widget
     {
       id: 'commit.actions',
-      kind: 'form',
-      title: 'Actions',
-      description: 'Commit operations',
+      kind: 'card',
+      title: 'Quick Actions',
+      description: 'Common commit workflow actions',
+      data: {
+        source: {
+          type: 'mock',
+          fixtureId: 'empty',
+        },
+      },
       actions: [
         {
           id: 'generate',
           label: 'Generate Plan',
-          icon: 'magic',
+          icon: 'ThunderboltOutlined',
           variant: 'primary',
-          endpoint: { type: 'rest', routeId: '/v1/plugins/commit/generate', method: 'POST' },
+          handler: {
+            type: 'rest',
+            routeId: COMMIT_WIDGET_ROUTES.GENERATE,
+            method: 'POST',
+          },
         },
         {
           id: 'apply',
           label: 'Apply Commits',
-          icon: 'check',
-          variant: 'success',
-          endpoint: { type: 'rest', routeId: '/v1/plugins/commit/apply', method: 'POST' },
-          confirm: { message: 'Apply commits?' },
+          icon: 'CheckOutlined',
+          variant: 'default',
+          handler: {
+            type: 'rest',
+            routeId: COMMIT_WIDGET_ROUTES.APPLY,
+            method: 'POST',
+          },
+          confirm: {
+            title: 'Apply Commits',
+            description: 'This will create git commits according to the plan. Continue?',
+            confirmLabel: 'Apply',
+            cancelLabel: 'Cancel',
+          },
         },
         {
           id: 'push',
           label: 'Push',
-          icon: 'upload',
-          endpoint: { type: 'rest', routeId: '/v1/plugins/commit/push', method: 'POST' },
-          confirm: { message: 'Push to remote?' },
-        },
-        {
-          id: 'reset',
-          label: 'Reset',
-          icon: 'trash',
-          variant: 'danger',
-          endpoint: { type: 'rest', routeId: '/v1/plugins/commit/plan', method: 'DELETE' },
-          confirm: { message: 'Delete plan?' },
+          icon: 'UploadOutlined',
+          handler: {
+            type: 'rest',
+            routeId: COMMIT_WIDGET_ROUTES.PUSH,
+            method: 'POST',
+          },
+          confirm: {
+            title: 'Push to Remote',
+            description: 'This will push commits to the remote repository. Continue?',
+            confirmLabel: 'Push',
+            cancelLabel: 'Cancel',
+          },
         },
       ],
-      events: {
-        subscribe: ['workspace:changed'],
-        emit: ['form:submitted'],
+      layoutHint: { w: 6, h: 3, minH: 2 },
+      order: 6,
+    },
+    // Files Section (collapsible, GitLab-style)
+    {
+      id: 'commit.files-section',
+      kind: 'section',
+      title: 'Changed Files',
+      description: 'Files with uncommitted changes',
+      options: {
+        collapsible: true,
+        defaultExpanded: true,
+        variant: 'bordered',
+        icon: 'FolderOutlined',
+        showDivider: true,
       },
-      layoutHint: { w: 6, h: 1 },
+      children: ['commit.git-files'],
+      events: {
+        subscribe: [{
+          name: COMMIT_EVENTS.WORKSPACE_CHANGED,
+          paramsMap: { workspace: 'workspace' },
+        }],
+      },
+      layoutHint: { w: 6, h: 8, minH: 4 },
       order: 4,
     },
+    // Plan Section (collapsible, GitLab-style)
+    {
+      id: 'commit.plan-section',
+      kind: 'section',
+      title: 'Commit Plan',
+      description: 'Generated commits ready to apply',
+      options: {
+        collapsible: true,
+        defaultExpanded: true,
+        variant: 'bordered',
+        icon: 'FileTextOutlined',
+        showDivider: true,
+      },
+      children: ['commit.plan-viewer'],
+      events: {
+        subscribe: [
+          {
+            name: COMMIT_EVENTS.WORKSPACE_CHANGED,
+            paramsMap: { workspace: 'workspace' },
+          },
+          COMMIT_EVENTS.FORM_SUBMITTED,
+        ],
+      },
+      layoutHint: { w: 6, h: 8, minH: 4 },
+      order: 5,
+    },
+    ],
+    // Studio menus
+    menus: [
+      {
+        id: 'commit-menu',
+        label: 'Commit',
+        icon: 'GitlabOutlined',
+        target: '/plugins/commit/overview',
+        order: 0,
+      },
+      {
+        id: 'commit-overview',
+        label: 'Overview',
+        icon: 'DashboardOutlined',
+        parentId: 'commit-menu',
+        target: '/plugins/commit/overview',
+        order: 1,
+      },
+      {
+        id: 'commit-plan',
+        label: 'Plan',
+        icon: 'UnorderedListOutlined',
+        parentId: 'commit-menu',
+        target: '/plugins/commit/plan',
+        order: 2,
+      },
+      {
+        id: 'commit-files',
+        label: 'Files',
+        icon: 'FileTextOutlined',
+        parentId: 'commit-menu',
+        target: '/plugins/commit/files',
+        order: 3,
+      },
+    ],
+    // Studio layouts
+    layouts: [
+      // Overview page - Quick status and actions
+      {
+        id: 'commit.overview',
+        kind: 'grid',
+        title: 'Overview',
+        description: 'Workspace status and quick actions',
+        icon: 'home',
+        widgets: [
+          'commit.workspace-selector',
+          'commit.status',
+          'commit.actions',
+        ],
+        config: {
+          cols: 6,
+          gap: 16,
+        },
+        order: 1,
+      },
+      // Plan page - GitLab-style commit plan view
+      {
+        id: 'commit.plan',
+        kind: 'grid',
+        title: 'Commit Plan',
+        description: 'Review and manage generated commits',
+        icon: 'list',
+        widgets: [
+          'commit.workspace-selector',
+          'commit.files-section',
+          'commit.plan-section',
+        ],
+        actions: [
+          {
+            id: 'generate',
+            label: 'Generate Plan',
+            icon: 'ThunderboltOutlined',
+            variant: 'primary',
+            handler: {
+              type: 'rest',
+              routeId: COMMIT_WIDGET_ROUTES.GENERATE,
+              method: 'POST',
+            },
+          },
+          {
+            id: 'apply',
+            label: 'Apply Commits',
+            icon: 'CheckOutlined',
+            variant: 'default',
+            handler: {
+              type: 'rest',
+              routeId: COMMIT_WIDGET_ROUTES.APPLY,
+              method: 'POST',
+            },
+            confirm: {
+              title: 'Apply Commits',
+              description: 'This will create git commits according to the plan. Continue?',
+              confirmLabel: 'Apply',
+              cancelLabel: 'Cancel',
+            },
+          },
+          {
+            id: 'push',
+            label: 'Push',
+            icon: 'UploadOutlined',
+            handler: {
+              type: 'rest',
+              routeId: COMMIT_WIDGET_ROUTES.PUSH,
+              method: 'POST',
+            },
+            confirm: {
+              title: 'Push to Remote',
+              description: 'This will push commits to the remote repository. Continue?',
+              confirmLabel: 'Push',
+              cancelLabel: 'Cancel',
+            },
+          },
+          {
+            id: 'reset',
+            label: 'Reset Plan',
+            icon: 'DeleteOutlined',
+            variant: 'danger',
+            handler: {
+              type: 'rest',
+              routeId: COMMIT_WIDGET_ROUTES.RESET,
+              method: 'DELETE',
+            },
+            confirm: {
+              title: 'Reset Plan',
+              description: 'This will delete the current commit plan. This action cannot be undone.',
+              confirmLabel: 'Delete',
+              cancelLabel: 'Cancel',
+            },
+          },
+        ],
+        config: {
+          cols: 6,
+          gap: 16,
+        },
+        order: 2,
+      },
+      // Files page - Changed files table
+      {
+        id: 'commit.files',
+        kind: 'grid',
+        title: 'Changed Files',
+        description: 'Git status and modified files',
+        icon: 'file',
+        widgets: [
+          'commit.workspace-selector',
+          'commit.git-files',
+        ],
+        config: {
+          cols: 6,
+          gap: 16,
+        },
+        order: 3,
+      },
     ],
   },
 

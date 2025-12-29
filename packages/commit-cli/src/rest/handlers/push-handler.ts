@@ -1,4 +1,4 @@
-import { defineRestHandler, type RestHandlerContext } from '@kb-labs/sdk/rest';
+import { defineHandler } from '@kb-labs/sdk';
 import {
   PushRequestSchema,
   PushResponseSchema,
@@ -13,44 +13,20 @@ import * as path from 'node:path';
  *
  * Pushes commits to the remote repository.
  */
-export default defineRestHandler({
-  name: 'commit:push',
-  input: PushRequestSchema,
-  output: PushResponseSchema,
-
-  async handler(request: PushRequest, ctx: RestHandlerContext): Promise<PushResponse> {
-    const { workspace, remote, force } = request;
-
-    ctx.log('info', 'Pushing commits', {
-      requestId: ctx.requestId,
-      workspace,
-      remote,
-      force,
-    });
+export default defineHandler({
+  async execute(ctx, input: PushRequest): Promise<PushResponse> {
+    const { workspace, remote, force } = input;
 
     try {
       const cwd = getWorkspacePath(workspace);
 
-      const result = await pushCommits({ cwd, remote, force });
-
-      ctx.log('info', 'Commits pushed', {
-        requestId: ctx.requestId,
-        workspace,
-        success: result.success,
-        commits: result.commitsPushed,
-      });
+      const result = await pushCommits(cwd, { remote, force });
 
       return {
         result,
         workspace,
       };
     } catch (error) {
-      ctx.log('error', 'Failed to push commits', {
-        requestId: ctx.requestId,
-        workspace,
-        error: String(error),
-      });
-
       throw new Error(`Failed to push commits: ${error}`);
     }
   },
@@ -62,5 +38,5 @@ export default defineRestHandler({
 function getWorkspacePath(workspace: string): string {
   const cwd = process.cwd();
   if (workspace === 'root' || workspace === '.') return cwd;
-  return path.join(cwd, workspace.replace('@', '').replace('/', '-'));
+  return path.join(cwd, workspace.replace('@', '').replace(/\//g, '-'));
 }

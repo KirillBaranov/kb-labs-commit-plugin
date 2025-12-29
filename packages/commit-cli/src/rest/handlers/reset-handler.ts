@@ -1,9 +1,9 @@
-import { defineRestHandler, type RestHandlerContext } from '@kb-labs/sdk/rest';
+import { defineHandler } from '@kb-labs/sdk';
 import {
   ResetResponseSchema,
   type ResetResponse,
 } from '@kb-labs/commit-contracts';
-import { deletePlan } from '@kb-labs/commit-core/storage';
+import { clearPlan } from '@kb-labs/commit-core/storage';
 import * as path from 'node:path';
 
 /**
@@ -11,27 +11,14 @@ import * as path from 'node:path';
  *
  * Deletes the current commit plan.
  */
-export default defineRestHandler({
-  name: 'commit:reset',
-  output: ResetResponseSchema,
-
-  async handler(request: { workspace?: string }, ctx: RestHandlerContext): Promise<ResetResponse> {
-    const workspace = request.workspace || 'root';
-
-    ctx.log('info', 'Resetting commit plan', {
-      requestId: ctx.requestId,
-      workspace,
-    });
+export default defineHandler({
+  async execute(ctx, input: { workspace?: string }): Promise<ResetResponse> {
+    const workspace = input.workspace || 'root';
 
     try {
       const cwd = getWorkspacePath(workspace);
 
-      await deletePlan({ cwd });
-
-      ctx.log('info', 'Plan deleted', {
-        requestId: ctx.requestId,
-        workspace,
-      });
+      await clearPlan(cwd);
 
       return {
         success: true,
@@ -39,12 +26,6 @@ export default defineRestHandler({
         workspace,
       };
     } catch (error) {
-      ctx.log('error', 'Failed to delete plan', {
-        requestId: ctx.requestId,
-        workspace,
-        error: String(error),
-      });
-
       return {
         success: false,
         message: `Failed to delete plan: ${error}`,
@@ -60,5 +41,5 @@ export default defineRestHandler({
 function getWorkspacePath(workspace: string): string {
   const cwd = process.cwd();
   if (workspace === 'root' || workspace === '.') return cwd;
-  return path.join(cwd, workspace.replace('@', '').replace('/', '-'));
+  return path.join(cwd, workspace.replace('@', '').replace(/\//g, '-'));
 }

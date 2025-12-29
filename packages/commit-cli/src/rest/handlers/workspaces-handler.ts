@@ -1,8 +1,4 @@
-import { defineRestHandler, type RestHandlerContext } from '@kb-labs/sdk/rest';
-import {
-  WorkspacesResponseSchema,
-  type WorkspacesResponse,
-} from '@kb-labs/commit-contracts';
+import { defineHandler, type SelectData, type SelectOptionItem } from '@kb-labs/sdk';
 import { glob } from 'glob';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
@@ -10,108 +6,100 @@ import * as fs from 'node:fs/promises';
 /**
  * GET /workspaces handler
  *
- * Discovers all workspaces (git repositories) in the current directory.
- * For monorepos, finds all packages with their own .git or package.json.
+ * Fast discovery: finds all directories with package.json AND .git in the same directory.
+ * Only shows root-level git repositories, not nested packages.
+ * Git status analysis happens later when specific workspace is selected.
+ *
+ * Returns SelectData format for Studio select widget.
  */
-export default defineRestHandler({
-  name: 'commit:workspaces',
-  output: WorkspacesResponseSchema,
-
-  async handler(_request: unknown, ctx: RestHandlerContext): Promise<WorkspacesResponse> {
-    ctx.log('info', 'Discovering workspaces', { requestId: ctx.requestId });
-
-    const cwd = process.cwd();
-    const workspaces: WorkspacesResponse['workspaces'] = [];
+export default defineHandler({
+  async execute(ctx, _input: unknown): Promise<SelectData> {
+    const repoRoot = ctx.cwd;
+    const options: SelectOptionItem[] = [];
 
     try {
-      // Strategy 1: Find all directories with package.json (monorepo packages)
-      const packageFiles = await glob('**/package.json', {
-        cwd,
-        ignore: ['**/node_modules/**', '**/dist/**', '**/.git/**'],
+      // Find all top-level directories with package.json
+      const topLevelPackages = await glob('*/package.json', {
+        cwd: repoRoot,
         absolute: true,
+        ignore: ['node_modules/**'],
       });
 
-      for (const pkgFile of packageFiles) {
+      for (const pkgFile of topLevelPackages) {
         try {
           const pkgDir = path.dirname(pkgFile);
           const pkgContent = await fs.readFile(pkgFile, 'utf-8');
           const pkg = JSON.parse(pkgContent);
 
-          // Check if this directory has git (either its own .git or parent repo)
-          const hasGit = await checkGitRepo(pkgDir);
+          // Check if .git exists DIRECTLY in this directory (not walking up!)
+          const hasGit = await checkHasDirectGit(pkgDir);
 
-          if (hasGit && pkg.name) {
-            workspaces.push({
-              id: pkg.name,
-              name: pkg.name,
-              path: path.relative(cwd, pkgDir) || '.',
+          if (hasGit) {
+            // Use package name if available, otherwise use directory name
+            const dirName = path.basename(pkgDir);
+            options.push({
+              value: pkg.name || dirName,
+              label: pkg.name || dirName,
               description: pkg.description,
             });
           }
-        } catch (err) {
+        } catch {
           // Skip invalid package.json
-          ctx.log('warn', 'Failed to parse package.json', { file: pkgFile, error: String(err) });
         }
       }
 
+      // Deduplicate by value (prevents virtual scroll bugs)
+      const uniqueOptions = Array.from(
+        new Map(options.map(opt => [opt.value, opt])).values()
+      );
+
       // If no workspaces found, add root workspace
-      if (workspaces.length === 0) {
-        const rootPkgPath = path.join(cwd, 'package.json');
+      if (uniqueOptions.length === 0) {
+        const rootPkgPath = path.join(repoRoot, 'package.json');
         try {
           const rootPkgContent = await fs.readFile(rootPkgPath, 'utf-8');
           const rootPkg = JSON.parse(rootPkgContent);
 
-          workspaces.push({
-            id: rootPkg.name || 'root',
-            name: rootPkg.name || 'Root',
-            path: '.',
-            description: rootPkg.description,
+          uniqueOptions.push({
+            value: rootPkg.name || 'root',
+            label: rootPkg.name || 'Root',
+            description: rootPkg.description || 'Root workspace',
           });
         } catch {
           // No package.json, use generic root
-          workspaces.push({
-            id: 'root',
-            name: 'Root',
-            path: '.',
+          uniqueOptions.push({
+            value: 'root',
+            label: 'Root',
             description: 'Root workspace',
           });
         }
       }
 
-      ctx.log('info', 'Workspaces discovered', {
-        requestId: ctx.requestId,
-        count: workspaces.length
-      });
-
-      return { workspaces };
+      return {
+        value: uniqueOptions[0]?.value || 'root', // Default to first option
+        options: uniqueOptions,
+      };
     } catch (error) {
-      ctx.log('error', 'Failed to discover workspaces', {
-        requestId: ctx.requestId,
-        error: String(error)
-      });
-
-      // Return empty on error
-      return { workspaces: [] };
+      // Return error state
+      return {
+        value: 'root',
+        options: [{ value: 'root', label: 'Root', description: 'Root workspace' }],
+        error: String(error),
+      };
     }
   },
 });
 
 /**
- * Check if directory is in a git repository
+ * Check if .git directory exists DIRECTLY in the given directory
+ * Does NOT walk up the tree - only checks the exact directory
  */
-async function checkGitRepo(dir: string): Promise<boolean> {
-  let current = dir;
-
-  // Walk up directory tree looking for .git
-  while (current !== path.dirname(current)) {
-    try {
-      const gitPath = path.join(current, '.git');
-      await fs.access(gitPath);
-      return true;
-    } catch {
-      current = path.dirname(current);
-    }
+async function checkHasDirectGit(dir: string): Promise<boolean> {
+  try {
+    const gitPath = path.join(dir, '.git');
+    await fs.access(gitPath);
+    return true;
+  } catch {
+    return false;
   }
-
-  return false;
 }

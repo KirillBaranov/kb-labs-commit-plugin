@@ -1,65 +1,57 @@
-import { defineRestHandler, type RestHandlerContext } from '@kb-labs/sdk/rest';
-import {
-  PlanResponseSchema,
-  type PlanResponse,
-} from '@kb-labs/commit-contracts';
+import { defineHandler, type CardListData, type CardData } from '@kb-labs/sdk';
 import { loadPlan } from '@kb-labs/commit-core/storage';
 import * as path from 'node:path';
 
 /**
  * GET /plan handler
  *
- * Returns the current commit plan for the workspace, if one exists.
+ * Returns the current commit plan as CardListData for Studio cardlist widget.
  */
-export default defineRestHandler({
-  name: 'commit:plan',
-  output: PlanResponseSchema,
-
-  async handler(request: { workspace?: string }, ctx: RestHandlerContext): Promise<PlanResponse> {
-    const workspace = request.workspace || 'root';
-
-    ctx.log('info', 'Getting commit plan', {
-      requestId: ctx.requestId,
-      workspace,
-    });
+export default defineHandler({
+  async execute(ctx, input: { workspace?: string }): Promise<CardListData> {
+    const workspace = input.workspace || 'root';
 
     try {
       const cwd = getWorkspacePath(workspace);
-      const plan = await loadPlan({ cwd });
+      const plan = await loadPlan(cwd);
 
-      if (plan) {
-        ctx.log('info', 'Plan found', {
-          requestId: ctx.requestId,
-          workspace,
-          commits: plan.commits.length,
-        });
-
+      if (!plan || plan.commits.length === 0) {
         return {
-          hasPlan: true,
-          plan,
-          workspace,
-        };
-      } else {
-        ctx.log('info', 'No plan found', {
-          requestId: ctx.requestId,
-          workspace,
-        });
-
-        return {
-          hasPlan: false,
-          workspace,
+          cards: [],
+          total: 0,
         };
       }
-    } catch (error) {
-      ctx.log('error', 'Failed to load plan', {
-        requestId: ctx.requestId,
-        workspace,
-        error: String(error),
+
+      // Transform commit groups into cards
+      const cards: CardData[] = plan.commits.map((commit) => {
+        const typeColor =
+          commit.type === 'feat'
+            ? 'success'
+            : commit.type === 'fix'
+              ? 'warning'
+              : 'default';
+
+        return {
+          title: commit.scope ? `${commit.type}(${commit.scope})` : commit.type,
+          description: commit.message,
+          meta: [
+            { label: 'Type', value: commit.type },
+            ...(commit.scope ? [{ label: 'Scope', value: commit.scope }] : []),
+            { label: 'Files', value: String(commit.files.length) },
+          ],
+          status: typeColor,
+          tags: commit.files.map((file) => ({ label: file })),
+        };
       });
 
       return {
-        hasPlan: false,
-        workspace,
+        cards,
+        total: cards.length,
+      };
+    } catch (error) {
+      return {
+        cards: [],
+        total: 0,
       };
     }
   },
@@ -75,5 +67,5 @@ function getWorkspacePath(workspace: string): string {
     return cwd;
   }
 
-  return path.join(cwd, workspace.replace('@', '').replace('/', '-'));
+  return path.join(cwd, workspace.replace('@', '').replace(/\//g, '-'));
 }

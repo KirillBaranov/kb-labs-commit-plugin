@@ -1,11 +1,12 @@
-import { defineRestHandler, type RestHandlerContext } from '@kb-labs/sdk/rest';
+import { defineHandler } from '@kb-labs/sdk';
 import {
   ApplyRequestSchema,
   ApplyResponseSchema,
   type ApplyRequest,
   type ApplyResponse,
 } from '@kb-labs/commit-contracts';
-import { applyCommits } from '@kb-labs/commit-core/applier';
+import { applyCommitPlan } from '@kb-labs/commit-core/applier';
+import { loadPlan } from '@kb-labs/commit-core/storage';
 import * as path from 'node:path';
 
 /**
@@ -13,43 +14,26 @@ import * as path from 'node:path';
  *
  * Applies the current commit plan by creating git commits.
  */
-export default defineRestHandler({
-  name: 'commit:apply',
-  input: ApplyRequestSchema,
-  output: ApplyResponseSchema,
-
-  async handler(request: ApplyRequest, ctx: RestHandlerContext): Promise<ApplyResponse> {
-    const { workspace, force } = request;
-
-    ctx.log('info', 'Applying commit plan', {
-      requestId: ctx.requestId,
-      workspace,
-      force,
-    });
+export default defineHandler({
+  async execute(ctx, input: ApplyRequest): Promise<ApplyResponse> {
+    const { workspace, force } = input;
 
     try {
       const cwd = getWorkspacePath(workspace);
 
-      const result = await applyCommits({ cwd, force });
+      // Load the plan first
+      const plan = await loadPlan(cwd);
+      if (!plan) {
+        throw new Error('No commit plan found. Generate a plan first with POST /generate');
+      }
 
-      ctx.log('info', 'Commits applied', {
-        requestId: ctx.requestId,
-        workspace,
-        success: result.success,
-        commits: result.appliedCommits.length,
-      });
+      const result = await applyCommitPlan(cwd, plan, { force });
 
       return {
         result,
         workspace,
       };
     } catch (error) {
-      ctx.log('error', 'Failed to apply commits', {
-        requestId: ctx.requestId,
-        workspace,
-        error: String(error),
-      });
-
       throw new Error(`Failed to apply commits: ${error}`);
     }
   },
@@ -61,5 +45,5 @@ export default defineRestHandler({
 function getWorkspacePath(workspace: string): string {
   const cwd = process.cwd();
   if (workspace === 'root' || workspace === '.') return cwd;
-  return path.join(cwd, workspace.replace('@', '').replace('/', '-'));
+  return path.join(cwd, workspace.replace('@', '').replace(/\//g, '-'));
 }

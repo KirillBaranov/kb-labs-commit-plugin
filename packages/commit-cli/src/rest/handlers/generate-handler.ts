@@ -1,4 +1,4 @@
-import { defineRestHandler, type RestHandlerContext } from '@kb-labs/sdk/rest';
+import { defineHandler } from '@kb-labs/sdk';
 import {
   GenerateRequestSchema,
   GenerateResponseSchema,
@@ -6,7 +6,7 @@ import {
   type GenerateResponse,
 } from '@kb-labs/commit-contracts';
 import { generateCommitPlan } from '@kb-labs/commit-core/generator';
-import { savePlan } from '@kb-labs/commit-core/storage';
+import { savePlan, getCurrentPlanPath } from '@kb-labs/commit-core/storage';
 import * as path from 'node:path';
 
 /**
@@ -15,20 +15,9 @@ import * as path from 'node:path';
  * Generates a new commit plan for the workspace.
  * Uses LLM to analyze changes and group into conventional commits.
  */
-export default defineRestHandler({
-  name: 'commit:generate',
-  input: GenerateRequestSchema,
-  output: GenerateResponseSchema,
-
-  async handler(request: GenerateRequest, ctx: RestHandlerContext): Promise<GenerateResponse> {
-    const { workspace, scope, dryRun } = request;
-
-    ctx.log('info', 'Generating commit plan', {
-      requestId: ctx.requestId,
-      workspace,
-      scope,
-      dryRun,
-    });
+export default defineHandler({
+  async execute(ctx, input: GenerateRequest): Promise<GenerateResponse> {
+    const { workspace, scope, dryRun } = input;
 
     try {
       const cwd = getWorkspacePath(workspace);
@@ -42,7 +31,6 @@ export default defineRestHandler({
         scope,
         llmComplete,
         onProgress: (message) => {
-          ctx.log('debug', 'Generation progress', { message });
         },
       });
 
@@ -50,20 +38,8 @@ export default defineRestHandler({
 
       // Save plan unless dry-run
       if (!dryRun) {
-        planPath = await savePlan({ cwd, plan });
-
-        ctx.log('info', 'Commit plan saved', {
-          requestId: ctx.requestId,
-          workspace,
-          planPath,
-          commits: plan.commits.length,
-        });
-      } else {
-        ctx.log('info', 'Dry-run: plan not saved', {
-          requestId: ctx.requestId,
-          workspace,
-          commits: plan.commits.length,
-        });
+        await savePlan(cwd, plan);
+        planPath = getCurrentPlanPath(cwd);
       }
 
       return {
@@ -72,12 +48,6 @@ export default defineRestHandler({
         workspace,
       };
     } catch (error) {
-      ctx.log('error', 'Failed to generate plan', {
-        requestId: ctx.requestId,
-        workspace,
-        error: String(error),
-      });
-
       throw new Error(`Failed to generate commit plan: ${error}`);
     }
   },
@@ -93,5 +63,5 @@ function getWorkspacePath(workspace: string): string {
     return cwd;
   }
 
-  return path.join(cwd, workspace.replace('@', '').replace('/', '-'));
+  return path.join(cwd, workspace.replace('@', '').replace(/\//g, '-'));
 }

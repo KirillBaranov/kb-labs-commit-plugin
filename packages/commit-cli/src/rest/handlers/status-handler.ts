@@ -1,88 +1,88 @@
-import { defineRestHandler, type RestHandlerContext } from '@kb-labs/sdk/rest';
-import {
-  StatusResponseSchema,
-  type StatusResponse,
-} from '@kb-labs/commit-contracts';
+import { defineHandler, type RestInput, type MetricGroupData, type MetricData } from '@kb-labs/sdk';
 import { loadPlan } from '@kb-labs/commit-core/storage';
 import { getGitStatus } from '@kb-labs/commit-core/analyzer';
-import * as path from 'node:path';
+import { resolveWorkspacePath } from '../workspace-resolver';
+import { relative } from 'node:path';
+
+const STATUS_CACHE_TTL = 5000; // 5 seconds
 
 /**
  * GET /status handler
  *
- * Returns current status for a workspace:
- * - Whether a plan exists
- * - Git status summary
- * - Files and commits count
+ * Returns current status for a workspace as metrics for Studio metric-group widget.
+ * Uses ctx.platform.cache for git status caching.
  */
-export default defineRestHandler({
-  name: 'commit:status',
-  output: StatusResponseSchema,
-
-  async handler(request: { workspace?: string }, ctx: RestHandlerContext): Promise<StatusResponse> {
-    const workspace = request.workspace || 'root';
-
-    ctx.log('info', 'Getting commit status', {
-      requestId: ctx.requestId,
-      workspace,
-    });
+export default defineHandler({
+  async execute(ctx, input: RestInput<{ workspace?: string }>): Promise<MetricGroupData> {
+    const workspace = input.query?.workspace || 'root';
 
     try {
-      const cwd = getWorkspacePath(workspace);
+      const cwd = await resolveWorkspacePath(workspace, ctx.cwd);
 
       // Load current plan
-      const plan = await loadPlan({ cwd });
+      const plan = await loadPlan(cwd);
 
-      // Get git status
-      let gitStatus;
+      // Get git status (with platform cache)
       let filesChanged = 0;
+      const cacheKey = `git-status:${workspace}`;
 
-      try {
-        gitStatus = await getGitStatus({ cwd });
-        filesChanged =
-          gitStatus.status.staged.length +
-          gitStatus.status.unstaged.length +
-          gitStatus.status.untracked.length;
-      } catch (err) {
-        ctx.log('warn', 'Failed to get git status', { error: String(err) });
+      // Try to get from cache
+      const cached = await ctx.platform.cache.get(cacheKey);
+
+      if (cached !== null && cached !== undefined) {
+        // Use cached value
+        filesChanged = cached as number;
+      } else {
+        // Fetch fresh git status
+        try {
+          // For nested repos, calculate relative path from monorepo root to workspace
+          let scope: string | undefined;
+          if (workspace !== 'root' && workspace !== '.') {
+            const relativePath = relative(ctx.cwd, cwd);
+            scope = relativePath ? `${relativePath}/**` : undefined;
+          }
+
+          const gitStatus = await getGitStatus(ctx.cwd, scope ? { scope } : {});
+
+          filesChanged =
+            gitStatus.staged.length +
+            gitStatus.unstaged.length +
+            gitStatus.untracked.length;
+
+          // Store in cache with TTL
+          await ctx.platform.cache.set(cacheKey, filesChanged, STATUS_CACHE_TTL);
+        } catch (err) {
+          // Ignore git status errors
+        }
       }
 
-      return {
-        workspace,
-        hasPlan: !!plan,
-        planTimestamp: plan?.createdAt,
-        gitStatus: gitStatus?.status,
-        filesChanged,
-        commitsInPlan: plan?.commits.length || 0,
-      };
-    } catch (error) {
-      ctx.log('error', 'Failed to get status', {
-        requestId: ctx.requestId,
-        workspace,
-        error: String(error),
-      });
+      const metrics: MetricData[] = [
+        {
+          value: filesChanged,
+          label: 'Files Changed',
+          status: filesChanged > 0 ? 'warning' : 'default',
+        },
+        {
+          value: plan?.commits.length || 0,
+          label: 'Commits in Plan',
+          status: plan ? 'success' : 'default',
+        },
+        {
+          value: plan ? 'Yes' : 'No',
+          label: 'Has Plan',
+          status: plan ? 'success' : 'default',
+        },
+      ];
 
+      return { metrics };
+    } catch (error) {
       return {
-        workspace,
-        hasPlan: false,
-        filesChanged: 0,
-        commitsInPlan: 0,
+        metrics: [
+          { value: 0, label: 'Files Changed', status: 'default' },
+          { value: 0, label: 'Commits in Plan', status: 'default' },
+          { value: 'No', label: 'Has Plan', status: 'default' },
+        ],
       };
     }
   },
 });
-
-/**
- * Convert workspace ID to filesystem path
- */
-function getWorkspacePath(workspace: string): string {
-  const cwd = process.cwd();
-
-  if (workspace === 'root' || workspace === '.') {
-    return cwd;
-  }
-
-  // For scoped packages, convert @scope/name to path
-  // Assume workspace follows pattern: packages/<name> or .<workspace-name>
-  return path.join(cwd, workspace.replace('@', '').replace('/', '-'));
-}

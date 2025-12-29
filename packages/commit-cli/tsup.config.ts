@@ -23,6 +23,7 @@ export default defineConfig({
     'src/rest/handlers/push-handler.ts',
     'src/rest/handlers/reset-handler.ts',
     'src/rest/handlers/git-status-handler.ts',
+    'src/rest/handlers/files-handler.ts',
   ],
   external: [
     '@kb-labs/sdk',

@@ -19,4 +19,6 @@ export * from './schema';
 export * from './schema/rest.schema';
 export * from './flags';
 export * from './env';
+export * from './routes';
+export * from './events';
 

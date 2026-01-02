@@ -17,7 +17,7 @@ import * as path from 'node:path';
  */
 export default defineHandler({
   async execute(ctx, input: GenerateRequest): Promise<GenerateResponse> {
-    const { workspace, scope, dryRun } = input;
+    const { workspace = '.', scope, dryRun } = input;
 
     try {
       const cwd = getWorkspacePath(workspace);

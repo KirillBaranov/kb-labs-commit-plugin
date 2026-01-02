@@ -17,6 +17,7 @@ export default defineConfig({
     // REST API handlers
     'src/rest/handlers/workspaces-handler.ts',
     'src/rest/handlers/status-handler.ts',
+    'src/rest/handlers/actions-handler.ts',
     'src/rest/handlers/generate-handler.ts',
     'src/rest/handlers/plan-handler.ts',
     'src/rest/handlers/apply-handler.ts',

@@ -270,7 +270,7 @@ export type PushResult = z.infer<typeof PushResultSchema>;
  * Returns empty object for actions widget (widget only needs action buttons)
  */
 export const ActionsResponseSchema = z.object({
-  workspace: z.string().optional(),
+  scope: z.string().optional(),
 });
 
 export type ActionsResponse = z.infer<typeof ActionsResponseSchema>;

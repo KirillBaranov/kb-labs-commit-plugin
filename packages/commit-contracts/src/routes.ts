@@ -17,8 +17,8 @@ export const COMMIT_BASE_PATH = '/v1/plugins/commit' as const;
  * - manifest.studio.widgets[].actions[].endpoint.routeId (widget actions)
  */
 export const COMMIT_ROUTES = {
-  /** GET /workspaces - List available workspaces */
-  WORKSPACES: '/workspaces',
+  /** GET /scopes - List available scopes */
+  SCOPES: '/scopes',
 
   /** GET /status - Get current status (plan + git) */
   STATUS: '/status',
@@ -59,7 +59,7 @@ export const COMMIT_ROUTES = {
  * Useful for testing and documentation
  */
 export const COMMIT_FULL_ROUTES = {
-  WORKSPACES: `${COMMIT_BASE_PATH}${COMMIT_ROUTES.WORKSPACES}`,
+  SCOPES: `${COMMIT_BASE_PATH}${COMMIT_ROUTES.SCOPES}`,
   STATUS: `${COMMIT_BASE_PATH}${COMMIT_ROUTES.STATUS}`,
   PLAN: `${COMMIT_BASE_PATH}${COMMIT_ROUTES.PLAN}`,
   GIT_STATUS: `${COMMIT_BASE_PATH}${COMMIT_ROUTES.GIT_STATUS}`,
@@ -78,7 +78,7 @@ export const COMMIT_FULL_ROUTES = {
  * Use these in manifest.studio.widgets[].data.source.routeId
  */
 export const COMMIT_WIDGET_ROUTES = {
-  WORKSPACES: 'workspaces',
+  SCOPES: 'scopes',
   STATUS: 'status',
   PLAN: 'plan',
   GIT_STATUS: 'git-status',

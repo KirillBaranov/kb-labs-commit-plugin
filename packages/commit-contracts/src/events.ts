@@ -7,8 +7,8 @@
  * Event names for commit plugin widgets
  */
 export const COMMIT_EVENTS = {
-  /** Workspace selector changed */
-  WORKSPACE_CHANGED: 'workspace:changed',
+  /** Scope selector changed */
+  SCOPE_CHANGED: 'scope:changed',
   /** Form submitted (actions widget) */
   FORM_SUBMITTED: 'form:submitted',
   /** Commit plan generated */
@@ -21,10 +21,10 @@ export type CommitEventName = typeof COMMIT_EVENTS[keyof typeof COMMIT_EVENTS];
  * Event payload types
  */
 
-/** Payload for workspace:changed event */
-export interface WorkspaceChangedPayload {
-  /** Selected workspace ID */
-  workspace: string;
+/** Payload for scope:changed event */
+export interface ScopeChangedPayload {
+  /** Selected scope ID */
+  scope: string;
 }
 
 /** Payload for form:submitted event */
@@ -47,14 +47,14 @@ export interface PlanGeneratedPayload {
       files: string[];
     }>;
   };
-  /** Workspace where plan was generated */
-  workspace: string;
+  /** Scope where plan was generated */
+  scope: string;
 }
 
 /**
  * Union type for all commit event payloads
  */
 export type CommitEventPayload =
-  | WorkspaceChangedPayload
+  | ScopeChangedPayload
   | FormSubmittedPayload
   | PlanGeneratedPayload;

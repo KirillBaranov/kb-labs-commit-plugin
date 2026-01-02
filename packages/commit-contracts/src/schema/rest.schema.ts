@@ -8,39 +8,39 @@ import {
 } from '../schema';
 
 // ============================================================================
-// Workspace Management
+// Scopes
 // ============================================================================
 
 /**
- * Single workspace entry
+ * Single scope entry
  */
-export const WorkspaceSchema = z.object({
+export const ScopeSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   path: z.string().min(1),
   description: z.string().optional(),
 });
 
-export type Workspace = z.infer<typeof WorkspaceSchema>;
+export type Scope = z.infer<typeof ScopeSchema>;
 
 /**
- * GET /workspaces response
+ * GET /scopes response
  */
-export const WorkspacesResponseSchema = z.object({
-  workspaces: z.array(WorkspaceSchema),
+export const ScopesResponseSchema = z.object({
+  scopes: z.array(ScopeSchema),
 });
 
-export type WorkspacesResponse = z.infer<typeof WorkspacesResponseSchema>;
+export type ScopesResponse = z.infer<typeof ScopesResponseSchema>;
 
 // ============================================================================
 // Status
 // ============================================================================
 
 /**
- * GET /status?workspace=X response
+ * GET /status?scope=X response
  */
 export const StatusResponseSchema = z.object({
-  workspace: z.string(),
+  scope: z.string().default('root'),
   hasPlan: z.boolean(),
   planTimestamp: z.string().datetime().optional(),
   gitStatus: GitStatusSchema.optional(),
@@ -58,8 +58,7 @@ export type StatusResponse = z.infer<typeof StatusResponseSchema>;
  * POST /generate request body
  */
 export const GenerateRequestSchema = z.object({
-  workspace: z.string().min(1),
-  scope: z.string().optional(),
+  scope: z.string().default('root'),
   dryRun: z.boolean().default(false),
 });
 
@@ -71,7 +70,7 @@ export type GenerateRequest = z.infer<typeof GenerateRequestSchema>;
 export const GenerateResponseSchema = z.object({
   plan: CommitPlanSchema,
   planPath: z.string(),
-  workspace: z.string(),
+  scope: z.string().default('root'),
 });
 
 export type GenerateResponse = z.infer<typeof GenerateResponseSchema>;
@@ -81,12 +80,12 @@ export type GenerateResponse = z.infer<typeof GenerateResponseSchema>;
 // ============================================================================
 
 /**
- * GET /plan?workspace=X response
+ * GET /plan?scope=X response
  */
 export const PlanResponseSchema = z.object({
   hasPlan: z.boolean(),
   plan: CommitPlanSchema.optional(),
-  workspace: z.string(),
+  scope: z.string().default('root'),
 });
 
 export type PlanResponse = z.infer<typeof PlanResponseSchema>;
@@ -99,7 +98,7 @@ export type PlanResponse = z.infer<typeof PlanResponseSchema>;
  * POST /apply request body
  */
 export const ApplyRequestSchema = z.object({
-  workspace: z.string().min(1),
+  scope: z.string().default('root'),
   force: z.boolean().default(false),
 });
 
@@ -110,7 +109,7 @@ export type ApplyRequest = z.infer<typeof ApplyRequestSchema>;
  */
 export const ApplyResponseSchema = z.object({
   result: ApplyResultSchema,
-  workspace: z.string(),
+  scope: z.string().default('root'),
 });
 
 export type ApplyResponse = z.infer<typeof ApplyResponseSchema>;
@@ -123,7 +122,7 @@ export type ApplyResponse = z.infer<typeof ApplyResponseSchema>;
  * POST /push request body
  */
 export const PushRequestSchema = z.object({
-  workspace: z.string().min(1),
+  scope: z.string().default('root'),
   remote: z.string().default('origin'),
   force: z.boolean().default(false),
 });
@@ -135,7 +134,7 @@ export type PushRequest = z.infer<typeof PushRequestSchema>;
  */
 export const PushResponseSchema = z.object({
   result: PushResultSchema,
-  workspace: z.string(),
+  scope: z.string().default('root'),
 });
 
 export type PushResponse = z.infer<typeof PushResponseSchema>;
@@ -145,12 +144,12 @@ export type PushResponse = z.infer<typeof PushResponseSchema>;
 // ============================================================================
 
 /**
- * DELETE /plan response
+ * DELETE /plan?scope=X response
  */
 export const ResetResponseSchema = z.object({
   success: z.boolean(),
   message: z.string(),
-  workspace: z.string(),
+  scope: z.string().default('root'),
 });
 
 export type ResetResponse = z.infer<typeof ResetResponseSchema>;
@@ -160,10 +159,10 @@ export type ResetResponse = z.infer<typeof ResetResponseSchema>;
 // ============================================================================
 
 /**
- * GET /git-status?workspace=X response
+ * GET /git-status?scope=X response
  */
 export const GitStatusResponseSchema = z.object({
-  workspace: z.string(),
+  scope: z.string().default('root'),
   status: GitStatusSchema,
   summaries: z.array(FileSummarySchema),
   totalFiles: z.number().int().min(0),
@@ -176,10 +175,10 @@ export type GitStatusResponse = z.infer<typeof GitStatusResponseSchema>;
 // ============================================================================
 
 /**
- * GET /diff?workspace=X&file=Y response
+ * GET /diff?scope=X&file=Y response
  */
 export const FileDiffResponseSchema = z.object({
-  workspace: z.string(),
+  scope: z.string().default('root'),
   file: z.string(),
   diff: z.string(),
   additions: z.number().int().min(0).default(0),
@@ -196,7 +195,7 @@ export type FileDiffResponse = z.infer<typeof FileDiffResponseSchema>;
  * POST /summarize request body
  */
 export const SummarizeRequestSchema = z.object({
-  workspace: z.string().min(1),
+  scope: z.string().default('root'),
   /** Optional file path - if provided, summarize only this file */
   file: z.string().optional(),
 });
@@ -207,7 +206,7 @@ export type SummarizeRequest = z.infer<typeof SummarizeRequestSchema>;
  * POST /summarize response
  */
 export const SummarizeResponseSchema = z.object({
-  workspace: z.string(),
+  scope: z.string().default('root'),
   file: z.string().optional(),
   summary: z.string(),
   /** Token usage for the LLM call */

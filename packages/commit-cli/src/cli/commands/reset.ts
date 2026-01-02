@@ -7,6 +7,10 @@ import { defineCommand, findRepoRoot, type PluginContextV3 } from '@kb-labs/sdk'
 import { clearPlan, hasPlan } from '@kb-labs/commit-core';
 import type { ResetOutput } from '@kb-labs/commit-contracts';
 
+type ResetInput = {
+  scope?: string;
+};
+
 type ResetResult = {
   exitCode: number;
   result?: ResetOutput;
@@ -18,12 +22,14 @@ export default defineCommand({
   description: 'Clear current commit plan',
 
   handler: {
-    async execute(ctx: PluginContextV3): Promise<ResetResult> {
+    async execute(ctx: PluginContextV3, input: ResetInput): Promise<ResetResult> {
       const startTime = Date.now();
       const cwd = (await findRepoRoot(ctx.cwd || process.cwd())) ?? process.cwd();
 
+      const scope = input.scope ?? 'root';
+
       // Check if plan exists
-      const exists = await hasPlan(cwd);
+      const exists = await hasPlan(cwd, scope);
 
       if (!exists) {
         ctx.ui?.info?.('No commit plan to clear.');
@@ -40,7 +46,7 @@ export default defineCommand({
       }
 
       // Clear plan
-      await clearPlan(cwd);
+      await clearPlan(cwd, scope);
 
       ctx.ui?.success?.('Plan Cleared', {
         sections: [{

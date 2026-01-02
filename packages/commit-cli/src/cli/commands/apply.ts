@@ -15,6 +15,7 @@ import type { ApplyOutput } from '@kb-labs/commit-contracts';
 type ApplyInput = {
   force?: boolean;
   json?: boolean;
+  scope?: string;
 };
 
 type ApplyResult = {
@@ -32,10 +33,12 @@ export default defineCommand({
       const startTime = Date.now();
       const cwd = (await findRepoRoot(ctx.cwd || process.cwd())) ?? process.cwd();
 
+      const scope = input.scope ?? 'root';
+
       // Load current plan
       const loadLoader = useLoader('Loading commit plan...');
       loadLoader.start();
-      const plan = await loadPlan(cwd);
+      const plan = await loadPlan(cwd, scope);
 
       if (!plan) {
         loadLoader.fail('No commit plan found');
@@ -71,8 +74,8 @@ export default defineCommand({
 
       // Save to history and clear current plan on success
       if (result.success) {
-        await saveToHistory(cwd, plan, result);
-        await clearPlan(cwd);
+        await saveToHistory(cwd, plan, result, scope);
+        await clearPlan(cwd, scope);
         applyLoader.succeed(`Applied ${result.appliedCommits.length} commit(s) successfully`);
       } else {
         applyLoader.fail('Failed to apply commits');

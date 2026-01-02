@@ -105,8 +105,8 @@ export default defineCommand({
       // Save plan
       const saveLoader = useLoader('Saving plan...');
       saveLoader.start();
-      await savePlan(cwd, plan);
-      const planPath = getCurrentPlanPath(cwd);
+      await savePlan(cwd, plan, effectiveScope);
+      const planPath = getCurrentPlanPath(cwd, effectiveScope);
       saveLoader.succeed('Plan saved');
 
       analyzeLoader.succeed(`Generated commit plan with ${plan.commits.length} commit(s)`);

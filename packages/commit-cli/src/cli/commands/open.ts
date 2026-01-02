@@ -9,6 +9,7 @@ import type { OpenOutput } from '@kb-labs/commit-contracts';
 
 type OpenInput = {
   json?: boolean;
+  scope?: string;
 };
 
 type OpenResult = {
@@ -26,9 +27,11 @@ export default defineCommand({
       const startTime = Date.now();
       const cwd = (await findRepoRoot(ctx.cwd || process.cwd())) ?? process.cwd();
 
+      const scope = input.scope ?? 'root';
+
       // Load current plan
-      const plan = await loadPlan(cwd);
-      const planPath = getCurrentPlanPath(cwd);
+      const plan = await loadPlan(cwd, scope);
+      const planPath = getCurrentPlanPath(cwd, scope);
 
       // Output
       const output: OpenOutput = {

@@ -304,6 +304,27 @@ export const manifest = {
       path: COMMIT_ROUTES.FILES,
       handler: './rest/handlers/files-handler.js#default',
     },
+    // GET /diff
+    {
+      method: 'GET',
+      path: COMMIT_ROUTES.DIFF,
+      handler: './rest/handlers/diff-handler.js#default',
+      output: {
+        zod: '@kb-labs/commit-contracts#FileDiffResponseSchema',
+      },
+    },
+    // POST /summarize
+    {
+      method: 'POST',
+      path: COMMIT_ROUTES.SUMMARIZE,
+      handler: './rest/handlers/summarize-handler.js#default',
+      input: {
+        zod: '@kb-labs/commit-contracts#SummarizeRequestSchema',
+      },
+      output: {
+        zod: '@kb-labs/commit-contracts#SummarizeResponseSchema',
+      },
+    },
     // GET /actions
     {
       method: 'GET',
@@ -317,6 +338,9 @@ export const manifest = {
   },
 
   // Studio UI widgets
+  // TODO: Temporarily disabled - using custom page in kb-labs-studio instead
+  // Will re-enable when widget UI is fully polished
+  /*
   studio: {
     widgets: [
     // Workspace Selector
@@ -735,6 +759,7 @@ export const manifest = {
       },
     ],
   },
+  */
 
   // Artifacts
   artifacts: [

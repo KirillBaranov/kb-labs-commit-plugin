@@ -32,6 +32,12 @@ export const COMMIT_ROUTES = {
   /** GET /files - Get file tree with diff statistics */
   FILES: '/files',
 
+  /** GET /diff - Get diff for a specific file */
+  DIFF: '/diff',
+
+  /** POST /summarize - Summarize changes using LLM */
+  SUMMARIZE: '/summarize',
+
   /** GET /actions - Get actions widget data */
   ACTIONS: '/actions',
 
@@ -58,6 +64,8 @@ export const COMMIT_FULL_ROUTES = {
   PLAN: `${COMMIT_BASE_PATH}${COMMIT_ROUTES.PLAN}`,
   GIT_STATUS: `${COMMIT_BASE_PATH}${COMMIT_ROUTES.GIT_STATUS}`,
   FILES: `${COMMIT_BASE_PATH}${COMMIT_ROUTES.FILES}`,
+  DIFF: `${COMMIT_BASE_PATH}${COMMIT_ROUTES.DIFF}`,
+  SUMMARIZE: `${COMMIT_BASE_PATH}${COMMIT_ROUTES.SUMMARIZE}`,
   ACTIONS: `${COMMIT_BASE_PATH}${COMMIT_ROUTES.ACTIONS}`,
   GENERATE: `${COMMIT_BASE_PATH}${COMMIT_ROUTES.GENERATE}`,
   APPLY: `${COMMIT_BASE_PATH}${COMMIT_ROUTES.APPLY}`,
@@ -75,6 +83,8 @@ export const COMMIT_WIDGET_ROUTES = {
   PLAN: 'plan',
   GIT_STATUS: 'git-status',
   FILES: 'files',
+  DIFF: 'diff',
+  SUMMARIZE: 'summarize',
   ACTIONS: 'actions',
   GENERATE: 'generate',
   APPLY: 'apply',

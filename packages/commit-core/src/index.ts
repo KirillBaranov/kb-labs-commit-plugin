@@ -18,9 +18,11 @@ export {
   isProtectedBranch,
   getFileSummaries,
   formatFileSummary,
+  getFileDiff,
   getRecentCommits,
   detectCommitStyle,
 } from './analyzer';
+export type { FileDiff } from './analyzer';
 
 // Generator
 export {

@@ -13,6 +13,8 @@ export {
 
 export { getFileSummaries, formatFileSummary } from './file-summary';
 
+export { getFileDiff, type FileDiff } from './file-diff';
+
 export { getRecentCommits, detectCommitStyle } from './recent-commits';
 
 export { resolveScope, matchesScope, type ResolvedScope, type PackageInfo } from './scope-resolver';

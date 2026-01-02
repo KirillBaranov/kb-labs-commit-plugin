@@ -2,7 +2,7 @@
  * REST API handlers for commit plugin
  */
 
-export { handleGetWorkspaces } from './handlers/workspaces-handler';
+export { default as handleGetScopes } from './handlers/scopes-handler';
 export { handleGetStatus } from './handlers/status-handler';
 export { handleGenerate } from './handlers/generate-handler';
 export { handleGetPlan } from './handlers/plan-handler';

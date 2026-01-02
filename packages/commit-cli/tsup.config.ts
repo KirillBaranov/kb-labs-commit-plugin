@@ -15,7 +15,7 @@ export default defineConfig({
     'src/cli/commands/open.ts',
     'src/cli/commands/reset.ts',
     // REST API handlers
-    'src/rest/handlers/workspaces-handler.ts',
+    'src/rest/handlers/scopes-handler.ts',
     'src/rest/handlers/status-handler.ts',
     'src/rest/handlers/actions-handler.ts',
     'src/rest/handlers/generate-handler.ts',

@@ -217,13 +217,13 @@ export const manifest = {
   rest: {
     basePath: COMMIT_BASE_PATH,
     routes: [
-    // GET /workspaces
+    // GET /scopes
     {
       method: 'GET',
-      path: COMMIT_ROUTES.WORKSPACES,
-      handler: './rest/handlers/workspaces-handler.js#default',
+      path: COMMIT_ROUTES.SCOPES,
+      handler: './rest/handlers/scopes-handler.js#default',
       output: {
-        zod: '@kb-labs/commit-contracts#WorkspacesResponseSchema',
+        zod: '@kb-labs/sdk#SelectDataSchema',
       },
     },
     // GET /status
@@ -246,6 +246,7 @@ export const manifest = {
       output: {
         zod: '@kb-labs/commit-contracts#GenerateResponseSchema',
       },
+      timeoutMs: 120000, // 2 minutes for LLM analysis
     },
     // GET /plan
     {
@@ -347,23 +348,23 @@ export const manifest = {
     {
       id: 'commit.workspace-selector',
       kind: 'select',
-      title: 'Select Workspace',
+      title: 'Select Scope',
       description: 'Choose monorepo package or repository',
       data: {
         source: {
           type: 'rest',
-          routeId: COMMIT_WIDGET_ROUTES.WORKSPACES,
+          routeId: COMMIT_WIDGET_ROUTES.SCOPES,
           method: 'GET',
         },
       },
       options: {
         searchable: true,
-        placeholder: 'Select workspace...',
+        placeholder: 'Select scope...',
       },
       events: {
         emit: [{
-          name: COMMIT_EVENTS.WORKSPACE_CHANGED,
-          payloadMap: { workspace: 'value' },  // Maps selected value to payload.workspace
+          name: COMMIT_EVENTS.SCOPE_CHANGED,
+          payloadMap: { scope: 'value' },  // Maps selected value to payload.scope
         }],
       },
       layoutHint: { w: 6, h: 1, minH: 1 },
@@ -385,8 +386,8 @@ export const manifest = {
       events: {
         subscribe: [
           {
-            name: COMMIT_EVENTS.WORKSPACE_CHANGED,
-            paramsMap: { workspace: 'workspace' },  // Maps payload.workspace to params.workspace
+            name: COMMIT_EVENTS.SCOPE_CHANGED,
+            paramsMap: { scope: 'scope' },  // Maps payload.workspace to params.workspace
           },
           COMMIT_EVENTS.FORM_SUBMITTED,
         ],
@@ -414,8 +415,8 @@ export const manifest = {
       events: {
         subscribe: [
           {
-            name: COMMIT_EVENTS.WORKSPACE_CHANGED,
-            paramsMap: { workspace: 'workspace' },
+            name: COMMIT_EVENTS.SCOPE_CHANGED,
+            paramsMap: { scope: 'scope' },
           },
           {
             name: COMMIT_EVENTS.PLAN_GENERATED,
@@ -467,8 +468,8 @@ export const manifest = {
       },
       events: {
         subscribe: [{
-          name: COMMIT_EVENTS.WORKSPACE_CHANGED,
-          paramsMap: { workspace: 'workspace' },
+          name: COMMIT_EVENTS.SCOPE_CHANGED,
+          paramsMap: { scope: 'scope' },
         }],
       },
       order: 3,
@@ -488,8 +489,8 @@ export const manifest = {
       },
       events: {
         subscribe: [{
-          name: COMMIT_EVENTS.WORKSPACE_CHANGED,
-          paramsMap: { workspace: 'workspace' },
+          name: COMMIT_EVENTS.SCOPE_CHANGED,
+          paramsMap: { scope: 'scope' },
         }],
       },
       actions: [
@@ -502,7 +503,7 @@ export const manifest = {
             type: 'rest',
             routeId: COMMIT_WIDGET_ROUTES.GENERATE,
             method: 'POST',
-            bodyMap: { workspace: 'workspace' },
+            bodyMap: { scope: 'scope' },
             onSuccess: {
               emitEvent: COMMIT_EVENTS.PLAN_GENERATED,
               // Response data will be used as payload (contains plan + workspace)
@@ -518,7 +519,7 @@ export const manifest = {
             type: 'rest',
             routeId: COMMIT_WIDGET_ROUTES.APPLY,
             method: 'POST',
-            bodyMap: { workspace: 'workspace' },
+            bodyMap: { scope: 'scope' },
           },
           confirm: {
             title: 'Apply Commits',
@@ -535,7 +536,7 @@ export const manifest = {
             type: 'rest',
             routeId: COMMIT_WIDGET_ROUTES.PUSH,
             method: 'POST',
-            bodyMap: { workspace: 'workspace' },
+            bodyMap: { scope: 'scope' },
           },
           confirm: {
             title: 'Push to Remote',
@@ -567,8 +568,8 @@ export const manifest = {
       children: ['commit.git-files'],
       events: {
         subscribe: [{
-          name: COMMIT_EVENTS.WORKSPACE_CHANGED,
-          paramsMap: { workspace: 'workspace' },
+          name: COMMIT_EVENTS.SCOPE_CHANGED,
+          paramsMap: { scope: 'scope' },
         }],
       },
       layoutHint: { w: 6, h: 8, minH: 4 },
@@ -594,8 +595,8 @@ export const manifest = {
       events: {
         subscribe: [
           {
-            name: COMMIT_EVENTS.WORKSPACE_CHANGED,
-            paramsMap: { workspace: 'workspace' },
+            name: COMMIT_EVENTS.SCOPE_CHANGED,
+            paramsMap: { scope: 'scope' },
           },
           COMMIT_EVENTS.FORM_SUBMITTED,
         ],

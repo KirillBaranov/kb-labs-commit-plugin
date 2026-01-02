@@ -5,14 +5,14 @@ import type { ActionsResponse } from '@kb-labs/commit-contracts';
  * GET /actions handler
  *
  * Returns minimal data for actions widget (widget mainly displays action buttons).
- * Returns currently selected workspace for context.
+ * Returns currently selected scope for context.
  */
 export default defineHandler({
-  async execute(_ctx: PluginContextV3, input: RestInput<{ workspace?: string }>): Promise<ActionsResponse> {
-    const workspace = input.query?.workspace;
+  async execute(_ctx: PluginContextV3, input: RestInput<{ scope?: string }>): Promise<ActionsResponse> {
+    const scope = input.query?.scope;
 
     return {
-      workspace,
+      scope,
     };
   },
 });

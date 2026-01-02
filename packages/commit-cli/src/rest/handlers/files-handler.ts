@@ -1,7 +1,6 @@
 import { defineHandler, type RestInput, type TableData, type TableRow, type PluginContextV3 } from '@kb-labs/sdk';
 import { getGitStatus } from '@kb-labs/commit-core/analyzer';
-import { resolveWorkspacePath } from '../workspace-resolver';
-import { relative } from 'node:path';
+import { resolveScopePath } from './scope-resolver';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 
@@ -30,11 +29,11 @@ interface FileRow extends TableRow {
  * Response format: TableData with rows array
  */
 export default defineHandler({
-  async execute(ctx: PluginContextV3, input: RestInput<{ workspace?: string }>): Promise<TableData> {
-    const workspace = input.query?.workspace || 'root';
+  async execute(ctx: PluginContextV3, input: RestInput<{ scope?: string }>): Promise<TableData> {
+    const scope = input.query?.scope || 'root';
 
     // Check cache first
-    const cacheKey = `files-list:${workspace}`;
+    const cacheKey = `files-list:${scope}`;
     const cached = await ctx.platform.cache.get(cacheKey);
 
     if (cached !== null && cached !== undefined) {
@@ -42,17 +41,11 @@ export default defineHandler({
     }
 
     try {
-      const cwd = await resolveWorkspacePath(workspace, ctx.cwd);
+      // Resolve scope to actual directory path
+      const scopeCwd = resolveScopePath(ctx.cwd, scope);
 
-      // Calculate relative path for scope
-      let scope: string | undefined;
-      if (workspace !== 'root' && workspace !== '.') {
-        const relativePath = relative(ctx.cwd, cwd);
-        scope = relativePath ? `${relativePath}/**` : undefined;
-      }
-
-      // Get git status
-      const gitStatus = await getGitStatus(ctx.cwd, scope ? { scope } : {});
+      // Get git status (git runs FROM scopeCwd, no filtering)
+      const gitStatus = await getGitStatus(scopeCwd);
 
       // Get diff stats for each file
       const allFiles = [
@@ -61,7 +54,7 @@ export default defineHandler({
         ...gitStatus.untracked,
       ];
 
-      const diffStats = await getDiffStats(ctx.cwd, allFiles);
+      const diffStats = await getDiffStats(scopeCwd, allFiles);
 
       // Build flat file list
       const rows: FileRow[] = [];

@@ -6,7 +6,7 @@ import {
   type PushResponse,
 } from '@kb-labs/commit-contracts';
 import { pushCommits } from '@kb-labs/commit-core/applier';
-import * as path from 'node:path';
+import { resolveScopePath } from './scope-resolver';
 
 /**
  * POST /push handler
@@ -14,29 +14,22 @@ import * as path from 'node:path';
  * Pushes commits to the remote repository.
  */
 export default defineHandler({
-  async execute(_ctx: PluginContextV3, input: PushRequest): Promise<PushResponse> {
-    const { workspace, remote, force } = input;
+  async execute(ctx: PluginContextV3, input: PushRequest): Promise<PushResponse> {
+    const { scope = 'root', remote, force } = input;
 
     try {
-      const cwd = getWorkspacePath(workspace);
+      // Resolve scope to actual directory path
+      const scopeCwd = resolveScopePath(ctx.cwd, scope);
 
-      const result = await pushCommits(cwd, { remote, force });
+      // Push commits (git runs FROM scopeCwd)
+      const result = await pushCommits(scopeCwd, { remote, force });
 
       return {
         result,
-        workspace,
+        scope,
       };
     } catch (error) {
       throw new Error(`Failed to push commits: ${error}`);
     }
   },
 });
-
-/**
- * Convert workspace ID to filesystem path
- */
-function getWorkspacePath(workspace: string): string {
-  const cwd = process.cwd();
-  if (workspace === 'root' || workspace === '.') return cwd;
-  return path.join(cwd, workspace.replace('@', '').replace(/\//g, '-'));
-}

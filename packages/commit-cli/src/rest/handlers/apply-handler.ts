@@ -7,7 +7,7 @@ import {
 } from '@kb-labs/commit-contracts';
 import { applyCommitPlan } from '@kb-labs/commit-core/applier';
 import { loadPlan } from '@kb-labs/commit-core/storage';
-import * as path from 'node:path';
+import { resolveScopePath } from './scope-resolver';
 
 /**
  * POST /apply handler
@@ -15,35 +15,28 @@ import * as path from 'node:path';
  * Applies the current commit plan by creating git commits.
  */
 export default defineHandler({
-  async execute(_ctx: PluginContextV3, input: ApplyRequest): Promise<ApplyResponse> {
-    const { workspace, force } = input;
+  async execute(ctx: PluginContextV3, input: ApplyRequest): Promise<ApplyResponse> {
+    const { scope = 'root', force } = input;
 
     try {
-      const cwd = getWorkspacePath(workspace);
+      // Resolve scope to actual directory path
+      const scopeCwd = resolveScopePath(ctx.cwd, scope);
 
       // Load the plan first
-      const plan = await loadPlan(cwd);
+      const plan = await loadPlan(ctx.cwd, scope);
       if (!plan) {
         throw new Error('No commit plan found. Generate a plan first with POST /generate');
       }
 
-      const result = await applyCommitPlan(cwd, plan, { force });
+      // Apply commits (git runs FROM scopeCwd)
+      const result = await applyCommitPlan(scopeCwd, plan, { force });
 
       return {
         result,
-        workspace,
+        scope,
       };
     } catch (error) {
       throw new Error(`Failed to apply commits: ${error}`);
     }
   },
 });
-
-/**
- * Convert workspace ID to filesystem path
- */
-function getWorkspacePath(workspace: string): string {
-  const cwd = process.cwd();
-  if (workspace === 'root' || workspace === '.') return cwd;
-  return path.join(cwd, workspace.replace('@', '').replace(/\//g, '-'));
-}

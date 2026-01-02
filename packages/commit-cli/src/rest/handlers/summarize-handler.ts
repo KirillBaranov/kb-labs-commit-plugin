@@ -1,13 +1,13 @@
 import { defineHandler, type PluginContextV3, type RestInput, useLogger, useLLM } from '@kb-labs/sdk';
 import { type SummarizeRequest, type SummarizeResponse } from '@kb-labs/commit-contracts';
-import { getFileDiff, getAllChangedFiles, getGitStatus, resolveScope } from '@kb-labs/commit-core/analyzer';
-import * as path from 'node:path';
+import { getFileDiff, getAllChangedFiles, getGitStatus } from '@kb-labs/commit-core/analyzer';
+import { resolveScopePath } from './scope-resolver';
 
 /**
  * POST /summarize handler
  *
  * Summarizes changes using LLM. Can summarize:
- * - All changes in workspace (if no file specified)
+ * - All changes in scope (if no file specified)
  * - Specific file changes (if file specified)
  */
 export default defineHandler({
@@ -19,24 +19,14 @@ export default defineHandler({
       throw new Error('LLM is not available. Please configure an LLM adapter.');
     }
 
-    const { workspace, file } = input.body || {};
+    const { scope = 'root', file } = input.body || {};
 
-    if (!workspace) {
-      throw new Error('Workspace is required');
-    }
-
-    logger.info('[summarize-handler] Request received', { workspace, file });
+    logger.info('[summarize-handler] Request received', { scope, file });
 
     try {
-      // Resolve scope for the workspace
-      let cwd = ctx.cwd;
-      if (workspace && workspace !== 'root' && workspace !== '.') {
-        const resolvedScope = await resolveScope(ctx.cwd, workspace);
-        const packagePath = resolvedScope.packagePaths[0];
-        if (packagePath) {
-          cwd = path.join(ctx.cwd, packagePath);
-        }
-      }
+      // Resolve scope to actual directory path
+      const scopeCwd = resolveScopePath(ctx.cwd, scope);
+      logger.info('[summarize-handler] Resolved scope', { scope, scopeCwd });
 
       let prompt: string;
 
@@ -44,17 +34,8 @@ export default defineHandler({
         // Summarize specific file
         logger.info('[summarize-handler] Summarizing file', { file });
 
-        // Strip workspace prefix if present
-        let relativeFile = file;
-        if (workspace && workspace !== 'root' && workspace !== '.') {
-          const resolvedScope = await resolveScope(ctx.cwd, workspace);
-          const packagePath = resolvedScope.packagePaths[0];
-          if (packagePath && file.startsWith(packagePath + '/')) {
-            relativeFile = file.substring(packagePath.length + 1);
-          }
-        }
-
-        const diffResult = await getFileDiff(cwd, relativeFile);
+        // Get file diff (git runs FROM scopeCwd)
+        const diffResult = await getFileDiff(scopeCwd, file);
 
         prompt = `Analyze this git diff and provide a concise summary of what changed in this file.
 
@@ -75,13 +56,14 @@ Keep it concise and technical.`;
         // Summarize all changes
         logger.info('[summarize-handler] Summarizing all changes');
 
-        const gitStatus = await getGitStatus(cwd);
+        // Get git status (git runs FROM scopeCwd)
+        const gitStatus = await getGitStatus(scopeCwd);
         const files = getAllChangedFiles(gitStatus);
 
         if (files.length === 0) {
           return {
-            workspace,
-            summary: 'No changes detected in this workspace.',
+            scope,
+            summary: 'No changes detected in this scope.',
           };
         }
 
@@ -89,7 +71,7 @@ Keep it concise and technical.`;
         const filesToSummarize = files.slice(0, 10);
         const diffs = await Promise.all(
           filesToSummarize.map(async (f) => {
-            const diff = await getFileDiff(cwd, f);
+            const diff = await getFileDiff(scopeCwd, f);
             return { file: f, diff: diff.diff, additions: diff.additions, deletions: diff.deletions };
           })
         );
@@ -98,7 +80,7 @@ Keep it concise and technical.`;
           .map((d) => `### ${d.file} (+${d.additions} -${d.deletions})\n\`\`\`diff\n${d.diff}\n\`\`\``)
           .join('\n\n');
 
-        prompt = `Analyze these git diffs and provide a high-level summary of all changes in this workspace.
+        prompt = `Analyze these git diffs and provide a high-level summary of all changes in this scope.
 
 Total files changed: ${files.length}
 ${files.length > 10 ? `(Showing first 10 files)` : ''}
@@ -126,7 +108,7 @@ Keep it concise and at a high level.`;
       });
 
       return {
-        workspace,
+        scope,
         file,
         summary: result.content.trim(),
         tokensUsed: result.usage.promptTokens + result.usage.completionTokens,

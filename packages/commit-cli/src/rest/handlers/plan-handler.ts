@@ -1,6 +1,5 @@
 import { defineHandler, type PluginContextV3, type CardListData, type CardData } from '@kb-labs/sdk';
 import { loadPlan } from '@kb-labs/commit-core/storage';
-import * as path from 'node:path';
 
 /**
  * GET /plan handler
@@ -8,12 +7,11 @@ import * as path from 'node:path';
  * Returns the current commit plan as CardListData for Studio cardlist widget.
  */
 export default defineHandler({
-  async execute(_ctx: PluginContextV3, input: { workspace?: string }): Promise<CardListData> {
-    const workspace = input.workspace || 'root';
+  async execute(ctx: PluginContextV3, input: { scope?: string }): Promise<CardListData> {
+    const scope = input.scope || 'root';
 
     try {
-      const cwd = getWorkspacePath(workspace);
-      const plan = await loadPlan(cwd);
+      const plan = await loadPlan(ctx.cwd, scope);
 
       if (!plan || plan.commits.length === 0) {
         return {
@@ -56,16 +54,3 @@ export default defineHandler({
     }
   },
 });
-
-/**
- * Convert workspace ID to filesystem path
- */
-function getWorkspacePath(workspace: string): string {
-  const cwd = process.cwd();
-
-  if (workspace === 'root' || workspace === '.') {
-    return cwd;
-  }
-
-  return path.join(cwd, workspace.replace('@', '').replace(/\//g, '-'));
-}

@@ -260,3 +260,17 @@ export const PushResultSchema = z.object({
 });
 
 export type PushResult = z.infer<typeof PushResultSchema>;
+
+// ============================================================================
+// REST API Responses
+// ============================================================================
+
+/**
+ * GET /actions response
+ * Returns empty object for actions widget (widget only needs action buttons)
+ */
+export const ActionsResponseSchema = z.object({
+  workspace: z.string().optional(),
+});
+
+export type ActionsResponse = z.infer<typeof ActionsResponseSchema>;

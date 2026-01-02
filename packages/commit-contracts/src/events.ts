@@ -11,6 +11,8 @@ export const COMMIT_EVENTS = {
   WORKSPACE_CHANGED: 'workspace:changed',
   /** Form submitted (actions widget) */
   FORM_SUBMITTED: 'form:submitted',
+  /** Commit plan generated */
+  PLAN_GENERATED: 'plan:generated',
 } as const;
 
 export type CommitEventName = typeof COMMIT_EVENTS[keyof typeof COMMIT_EVENTS];
@@ -33,9 +35,26 @@ export interface FormSubmittedPayload {
   data?: Record<string, unknown>;
 }
 
+/** Payload for plan:generated event */
+export interface PlanGeneratedPayload {
+  /** The generated commit plan */
+  plan: {
+    commits: Array<{
+      type: string;
+      scope?: string;
+      message: string;
+      body?: string;
+      files: string[];
+    }>;
+  };
+  /** Workspace where plan was generated */
+  workspace: string;
+}
+
 /**
  * Union type for all commit event payloads
  */
 export type CommitEventPayload =
   | WorkspaceChangedPayload
-  | FormSubmittedPayload;
+  | FormSubmittedPayload
+  | PlanGeneratedPayload;

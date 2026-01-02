@@ -304,6 +304,15 @@ export const manifest = {
       path: COMMIT_ROUTES.FILES,
       handler: './rest/handlers/files-handler.js#default',
     },
+    // GET /actions
+    {
+      method: 'GET',
+      path: COMMIT_ROUTES.ACTIONS,
+      handler: './rest/handlers/actions-handler.js#default',
+      output: {
+        zod: '@kb-labs/commit-contracts#ActionsResponseSchema',
+      },
+    },
     ],
   },
 
@@ -384,6 +393,11 @@ export const manifest = {
             name: COMMIT_EVENTS.WORKSPACE_CHANGED,
             paramsMap: { workspace: 'workspace' },
           },
+          {
+            name: COMMIT_EVENTS.PLAN_GENERATED,
+            // When plan is generated, update widget data with cards
+            // No paramsMap - use entire payload as widget data
+          },
           COMMIT_EVENTS.FORM_SUBMITTED,
         ],
       },
@@ -443,9 +457,16 @@ export const manifest = {
       description: 'Common commit workflow actions',
       data: {
         source: {
-          type: 'mock',
-          fixtureId: 'empty',
+          type: 'rest',
+          routeId: COMMIT_WIDGET_ROUTES.ACTIONS,
+          method: 'GET',
         },
+      },
+      events: {
+        subscribe: [{
+          name: COMMIT_EVENTS.WORKSPACE_CHANGED,
+          paramsMap: { workspace: 'workspace' },
+        }],
       },
       actions: [
         {
@@ -457,6 +478,11 @@ export const manifest = {
             type: 'rest',
             routeId: COMMIT_WIDGET_ROUTES.GENERATE,
             method: 'POST',
+            bodyMap: { workspace: 'workspace' },
+            onSuccess: {
+              emitEvent: COMMIT_EVENTS.PLAN_GENERATED,
+              // Response data will be used as payload (contains plan + workspace)
+            },
           },
         },
         {
@@ -468,6 +494,7 @@ export const manifest = {
             type: 'rest',
             routeId: COMMIT_WIDGET_ROUTES.APPLY,
             method: 'POST',
+            bodyMap: { workspace: 'workspace' },
           },
           confirm: {
             title: 'Apply Commits',
@@ -484,6 +511,7 @@ export const manifest = {
             type: 'rest',
             routeId: COMMIT_WIDGET_ROUTES.PUSH,
             method: 'POST',
+            bodyMap: { workspace: 'workspace' },
           },
           confirm: {
             title: 'Push to Remote',
@@ -502,6 +530,9 @@ export const manifest = {
       kind: 'section',
       title: 'Changed Files',
       description: 'Files with uncommitted changes',
+      data: {
+        source: { type: 'static' },  // Sections use static source (no data)
+      },
       options: {
         collapsible: true,
         defaultExpanded: true,
@@ -525,6 +556,9 @@ export const manifest = {
       kind: 'section',
       title: 'Commit Plan',
       description: 'Generated commits ready to apply',
+      data: {
+        source: { type: 'static' },  // Sections use static source (no data)
+      },
       options: {
         collapsible: true,
         defaultExpanded: true,
@@ -593,6 +627,7 @@ export const manifest = {
           'commit.workspace-selector',
           'commit.status',
           'commit.actions',
+          'commit.plan-section',  // Show plan section on overview too
         ],
         config: {
           cols: 6,

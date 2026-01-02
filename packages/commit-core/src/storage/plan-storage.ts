@@ -10,12 +10,26 @@ import { getGitStatus } from '../analyzer/git-status';
 import { getFileSummaries } from '../analyzer/file-summary';
 
 const COMMIT_DIR = '.kb/commit';
+const PLANS_DIR = 'plans';
 const CURRENT_DIR = 'current';
 const HISTORY_DIR = 'history';
 const PLAN_FILE = 'plan.json';
 const STATUS_FILE = 'status.json';
 const RESULT_FILE = 'result.json';
 const MAX_HISTORY_ENTRIES = 30; // Keep last 30 history entries
+
+/**
+ * Normalize scope string for use in file paths
+ * @example "@kb-labs/mind" -> "@kb-labs-mind"
+ * @example "packages/core/**" -> "packages-core"
+ */
+function normalizeScopeForPath(scope: string): string {
+  return scope
+    .replace(/\//g, '-')
+    .replace(/\*/g, '')
+    .replace(/\./g, '-')
+    .replace(/:/g, '-');
+}
 
 /**
  * Get path to commit storage directory
@@ -25,25 +39,33 @@ export function getCommitStoragePath(cwd: string): string {
 }
 
 /**
- * Get path to current plan file
+ * Get path to scope-specific plan directory
  */
-export function getCurrentPlanPath(cwd: string): string {
-  return join(cwd, COMMIT_DIR, CURRENT_DIR, PLAN_FILE);
+export function getScopePlanDir(cwd: string, scope: string = 'root'): string {
+  const scopeDir = normalizeScopeForPath(scope);
+  return join(cwd, COMMIT_DIR, PLANS_DIR, scopeDir);
 }
 
 /**
- * Get path to current status file
+ * Get path to current plan file for a scope
  */
-export function getCurrentStatusPath(cwd: string): string {
-  return join(cwd, COMMIT_DIR, CURRENT_DIR, STATUS_FILE);
+export function getCurrentPlanPath(cwd: string, scope: string = 'root'): string {
+  return join(getScopePlanDir(cwd, scope), CURRENT_DIR, PLAN_FILE);
+}
+
+/**
+ * Get path to current status file for a scope
+ */
+export function getCurrentStatusPath(cwd: string, scope: string = 'root'): string {
+  return join(getScopePlanDir(cwd, scope), CURRENT_DIR, STATUS_FILE);
 }
 
 /**
  * Save commit plan to storage
  */
-export async function savePlan(cwd: string, plan: CommitPlan): Promise<void> {
-  const planPath = getCurrentPlanPath(cwd);
-  const statusPath = getCurrentStatusPath(cwd);
+export async function savePlan(cwd: string, plan: CommitPlan, scope: string = 'root'): Promise<void> {
+  const planPath = getCurrentPlanPath(cwd, scope);
+  const statusPath = getCurrentStatusPath(cwd, scope);
 
   // Ensure directory exists
   await mkdir(dirname(planPath), { recursive: true });
@@ -52,7 +74,7 @@ export async function savePlan(cwd: string, plan: CommitPlan): Promise<void> {
   await writeFile(planPath, JSON.stringify(plan, null, 2));
 
   // Save status snapshot
-  const status = await getGitStatus(cwd);
+  const status = await getGitStatus(cwd, { scope });
   const allFiles = [...status.staged, ...status.unstaged, ...status.untracked];
   const summaries = await getFileSummaries(cwd, allFiles);
 
@@ -69,8 +91,8 @@ export async function savePlan(cwd: string, plan: CommitPlan): Promise<void> {
 /**
  * Load current commit plan from storage
  */
-export async function loadPlan(cwd: string): Promise<CommitPlan | null> {
-  const planPath = getCurrentPlanPath(cwd);
+export async function loadPlan(cwd: string, scope: string = 'root'): Promise<CommitPlan | null> {
+  const planPath = getCurrentPlanPath(cwd, scope);
 
   try {
     const content = await readFile(planPath, 'utf-8');
@@ -91,8 +113,8 @@ export async function loadPlan(cwd: string): Promise<CommitPlan | null> {
 /**
  * Load current status snapshot from storage
  */
-export async function loadStatus(cwd: string): Promise<GitStatusSnapshot | null> {
-  const statusPath = getCurrentStatusPath(cwd);
+export async function loadStatus(cwd: string, scope: string = 'root'): Promise<GitStatusSnapshot | null> {
+  const statusPath = getCurrentStatusPath(cwd, scope);
 
   try {
     const content = await readFile(statusPath, 'utf-8');
@@ -112,16 +134,16 @@ export async function loadStatus(cwd: string): Promise<GitStatusSnapshot | null>
 /**
  * Check if a plan exists
  */
-export async function hasPlan(cwd: string): Promise<boolean> {
-  const plan = await loadPlan(cwd);
+export async function hasPlan(cwd: string, scope: string = 'root'): Promise<boolean> {
+  const plan = await loadPlan(cwd, scope);
   return plan !== null;
 }
 
 /**
  * Clear current commit plan
  */
-export async function clearPlan(cwd: string): Promise<void> {
-  const currentDir = join(cwd, COMMIT_DIR, CURRENT_DIR);
+export async function clearPlan(cwd: string, scope: string = 'root'): Promise<void> {
+  const currentDir = join(getScopePlanDir(cwd, scope), CURRENT_DIR);
 
   try {
     await rm(currentDir, { recursive: true, force: true });
@@ -136,10 +158,11 @@ export async function clearPlan(cwd: string): Promise<void> {
 export async function saveToHistory(
   cwd: string,
   plan: CommitPlan,
-  result: ApplyResult
+  result: ApplyResult,
+  scope: string = 'root'
 ): Promise<void> {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const historyDir = join(cwd, COMMIT_DIR, HISTORY_DIR, timestamp);
+  const historyDir = join(getScopePlanDir(cwd, scope), HISTORY_DIR, timestamp);
 
   await mkdir(historyDir, { recursive: true });
 
@@ -147,16 +170,17 @@ export async function saveToHistory(
   await writeFile(join(historyDir, RESULT_FILE), JSON.stringify(result, null, 2));
 
   // Clean old history entries after saving new one
-  await cleanOldHistory(cwd);
+  await cleanOldHistory(cwd, scope);
 }
 
 /**
  * List history entries
  */
 export async function listHistory(
-  cwd: string
+  cwd: string,
+  scope: string = 'root'
 ): Promise<Array<{ timestamp: string; path: string }>> {
-  const historyDir = join(cwd, COMMIT_DIR, HISTORY_DIR);
+  const historyDir = join(getScopePlanDir(cwd, scope), HISTORY_DIR);
 
   try {
     const entries = await readdir(historyDir, { withFileTypes: true });
@@ -178,9 +202,10 @@ export async function listHistory(
  */
 export async function cleanOldHistory(
   cwd: string,
+  scope: string = 'root',
   maxEntries: number = MAX_HISTORY_ENTRIES
 ): Promise<void> {
-  const entries = await listHistory(cwd);
+  const entries = await listHistory(cwd, scope);
 
   // If we have more entries than the limit, delete the oldest ones
   if (entries.length > maxEntries) {
@@ -199,13 +224,29 @@ export async function cleanOldHistory(
 /**
  * Initialize storage directory structure
  */
-export async function initStorage(cwd: string): Promise<void> {
+export async function initStorage(cwd: string, scope: string = 'root'): Promise<void> {
   const dirs = [
-    join(cwd, COMMIT_DIR, CURRENT_DIR),
-    join(cwd, COMMIT_DIR, HISTORY_DIR),
+    join(getScopePlanDir(cwd, scope), CURRENT_DIR),
+    join(getScopePlanDir(cwd, scope), HISTORY_DIR),
   ];
 
   for (const dir of dirs) {
     await mkdir(dir, { recursive: true });
+  }
+}
+
+/**
+ * List all scopes with plans
+ */
+export async function listScopes(cwd: string): Promise<string[]> {
+  const plansDir = join(cwd, COMMIT_DIR, PLANS_DIR);
+
+  try {
+    const entries = await readdir(plansDir, { withFileTypes: true });
+    return entries
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name);
+  } catch {
+    return [];
   }
 }

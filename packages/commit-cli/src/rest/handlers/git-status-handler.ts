@@ -1,6 +1,5 @@
-import { defineHandler, type TableData, type TableRow } from '@kb-labs/sdk';
-import { getGitStatus } from '@kb-labs/commit-core/analyzer';
-import * as path from 'node:path';
+import { defineHandler, type PluginContextV3, type TableData, type TableRow, type RestInput } from '@kb-labs/sdk';
+import { getGitStatus, resolveScope } from '@kb-labs/commit-core/analyzer';
 
 /**
  * GET /git-status handler
@@ -8,13 +7,23 @@ import * as path from 'node:path';
  * Returns git status as table data for Studio table widget.
  */
 export default defineHandler({
-  async execute(ctx, input: { workspace?: string }): Promise<TableData> {
-    const workspace = input.workspace || 'root';
+  async execute(ctx: PluginContextV3, input: RestInput<{ workspace?: string }>): Promise<TableData> {
+    const workspace = input.query?.workspace || 'root';
 
     try {
-      const cwd = getWorkspacePath(workspace);
+      // Resolve scope for the workspace
+      let scopePathForGit: string | undefined;
+      if (workspace && workspace !== 'root' && workspace !== '.') {
+        const resolvedScope = await resolveScope(ctx.cwd, workspace);
+        if (resolvedScope.packagePaths.length === 1) {
+          scopePathForGit = resolvedScope.packagePaths[0];
+        } else {
+          scopePathForGit = workspace;
+        }
+      }
 
-      const status = await getGitStatus(cwd);
+      // Get git status with scope
+      const status = await getGitStatus(ctx.cwd, { scope: scopePathForGit });
 
       // Convert git status to table rows
       const rows: TableRow[] = [];
@@ -52,12 +61,3 @@ export default defineHandler({
     }
   },
 });
-
-/**
- * Convert workspace ID to filesystem path
- */
-function getWorkspacePath(workspace: string): string {
-  const cwd = process.cwd();
-  if (workspace === 'root' || workspace === '.') return cwd;
-  return path.join(cwd, workspace.replace('@', '').replace(/\//g, '-'));
-}

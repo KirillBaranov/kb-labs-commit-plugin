@@ -1,4 +1,4 @@
-import { defineHandler, type RestInput, type TableData, type TableRow } from '@kb-labs/sdk';
+import { defineHandler, type RestInput, type TableData, type TableRow, type PluginContextV3 } from '@kb-labs/sdk';
 import { getGitStatus } from '@kb-labs/commit-core/analyzer';
 import { resolveWorkspacePath } from '../workspace-resolver';
 import { relative } from 'node:path';
@@ -30,7 +30,7 @@ interface FileRow extends TableRow {
  * Response format: TableData with rows array
  */
 export default defineHandler({
-  async execute(ctx, input: RestInput<{ workspace?: string }>): Promise<TableData> {
+  async execute(ctx: PluginContextV3, input: RestInput<{ workspace?: string }>): Promise<TableData> {
     const workspace = input.query?.workspace || 'root';
 
     // Check cache first

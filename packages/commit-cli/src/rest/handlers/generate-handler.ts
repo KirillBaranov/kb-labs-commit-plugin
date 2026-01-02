@@ -1,4 +1,4 @@
-import { defineHandler } from '@kb-labs/sdk';
+import { defineHandler, type PluginContextV3 } from '@kb-labs/sdk';
 import {
   GenerateRequestSchema,
   GenerateResponseSchema,
@@ -16,7 +16,7 @@ import * as path from 'node:path';
  * Uses LLM to analyze changes and group into conventional commits.
  */
 export default defineHandler({
-  async execute(ctx, input: GenerateRequest): Promise<GenerateResponse> {
+  async execute(ctx: PluginContextV3, input: GenerateRequest): Promise<GenerateResponse> {
     const { workspace = '.', scope, dryRun } = input;
 
     try {

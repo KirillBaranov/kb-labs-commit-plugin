@@ -1,4 +1,4 @@
-import { defineHandler, type SelectData, type SelectOptionItem } from '@kb-labs/sdk';
+import { defineHandler, type SelectData, type SelectOptionItem, type PluginContextV3 } from '@kb-labs/sdk';
 import { glob } from 'glob';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
@@ -13,7 +13,7 @@ import * as fs from 'node:fs/promises';
  * Returns SelectData format for Studio select widget.
  */
 export default defineHandler({
-  async execute(ctx, _input: unknown): Promise<SelectData> {
+  async execute(ctx: PluginContextV3, _input: unknown): Promise<SelectData> {
     const repoRoot = ctx.cwd;
     const options: SelectOptionItem[] = [];
 

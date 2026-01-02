@@ -1,4 +1,4 @@
-import { defineHandler, type CardListData, type CardData } from '@kb-labs/sdk';
+import { defineHandler, type PluginContextV3, type CardListData, type CardData } from '@kb-labs/sdk';
 import { loadPlan } from '@kb-labs/commit-core/storage';
 import * as path from 'node:path';
 
@@ -8,7 +8,7 @@ import * as path from 'node:path';
  * Returns the current commit plan as CardListData for Studio cardlist widget.
  */
 export default defineHandler({
-  async execute(ctx, input: { workspace?: string }): Promise<CardListData> {
+  async execute(_ctx: PluginContextV3, input: { workspace?: string }): Promise<CardListData> {
     const workspace = input.workspace || 'root';
 
     try {

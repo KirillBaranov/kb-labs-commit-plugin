@@ -1,4 +1,4 @@
-import { defineHandler, type RestInput, type MetricGroupData, type MetricData } from '@kb-labs/sdk';
+import { defineHandler, type RestInput, type MetricGroupData, type MetricData, type PluginContextV3 } from '@kb-labs/sdk';
 import { loadPlan } from '@kb-labs/commit-core/storage';
 import { getGitStatus } from '@kb-labs/commit-core/analyzer';
 import { resolveWorkspacePath } from '../workspace-resolver';
@@ -13,7 +13,7 @@ const STATUS_CACHE_TTL = 5000; // 5 seconds
  * Uses ctx.platform.cache for git status caching.
  */
 export default defineHandler({
-  async execute(ctx, input: RestInput<{ workspace?: string }>): Promise<MetricGroupData> {
+  async execute(ctx: PluginContextV3, input: RestInput<{ workspace?: string }>): Promise<MetricGroupData> {
     const workspace = input.query?.workspace || 'root';
 
     try {

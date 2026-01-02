@@ -1,4 +1,4 @@
-import { defineHandler } from '@kb-labs/sdk';
+import { defineHandler, type PluginContextV3 } from '@kb-labs/sdk';
 import {
   PushRequestSchema,
   PushResponseSchema,
@@ -14,7 +14,7 @@ import * as path from 'node:path';
  * Pushes commits to the remote repository.
  */
 export default defineHandler({
-  async execute(ctx, input: PushRequest): Promise<PushResponse> {
+  async execute(_ctx: PluginContextV3, input: PushRequest): Promise<PushResponse> {
     const { workspace, remote, force } = input;
 
     try {

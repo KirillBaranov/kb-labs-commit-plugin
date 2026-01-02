@@ -1,4 +1,4 @@
-import { defineHandler } from '@kb-labs/sdk';
+import { defineHandler, type PluginContextV3 } from '@kb-labs/sdk';
 import {
   ApplyRequestSchema,
   ApplyResponseSchema,
@@ -15,7 +15,7 @@ import * as path from 'node:path';
  * Applies the current commit plan by creating git commits.
  */
 export default defineHandler({
-  async execute(ctx, input: ApplyRequest): Promise<ApplyResponse> {
+  async execute(_ctx: PluginContextV3, input: ApplyRequest): Promise<ApplyResponse> {
     const { workspace, force } = input;
 
     try {

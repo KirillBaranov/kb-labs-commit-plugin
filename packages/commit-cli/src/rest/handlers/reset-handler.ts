@@ -1,4 +1,4 @@
-import { defineHandler } from '@kb-labs/sdk';
+import { defineHandler, type PluginContextV3 } from '@kb-labs/sdk';
 import {
   ResetResponseSchema,
   type ResetResponse,
@@ -12,7 +12,7 @@ import * as path from 'node:path';
  * Deletes the current commit plan.
  */
 export default defineHandler({
-  async execute(ctx, input: { workspace?: string }): Promise<ResetResponse> {
+  async execute(_ctx: PluginContextV3, input: { workspace?: string }): Promise<ResetResponse> {
     const workspace = input.workspace || 'root';
 
     try {

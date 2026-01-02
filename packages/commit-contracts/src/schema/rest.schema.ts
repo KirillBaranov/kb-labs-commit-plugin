@@ -170,3 +170,48 @@ export const GitStatusResponseSchema = z.object({
 });
 
 export type GitStatusResponse = z.infer<typeof GitStatusResponseSchema>;
+
+// ============================================================================
+// File Diff
+// ============================================================================
+
+/**
+ * GET /diff?workspace=X&file=Y response
+ */
+export const FileDiffResponseSchema = z.object({
+  workspace: z.string(),
+  file: z.string(),
+  diff: z.string(),
+  additions: z.number().int().min(0).default(0),
+  deletions: z.number().int().min(0).default(0),
+});
+
+export type FileDiffResponse = z.infer<typeof FileDiffResponseSchema>;
+
+// ============================================================================
+// Summarize Changes
+// ============================================================================
+
+/**
+ * POST /summarize request body
+ */
+export const SummarizeRequestSchema = z.object({
+  workspace: z.string().min(1),
+  /** Optional file path - if provided, summarize only this file */
+  file: z.string().optional(),
+});
+
+export type SummarizeRequest = z.infer<typeof SummarizeRequestSchema>;
+
+/**
+ * POST /summarize response
+ */
+export const SummarizeResponseSchema = z.object({
+  workspace: z.string(),
+  file: z.string().optional(),
+  summary: z.string(),
+  /** Token usage for the LLM call */
+  tokensUsed: z.number().int().min(0).optional(),
+});
+
+export type SummarizeResponse = z.infer<typeof SummarizeResponseSchema>;

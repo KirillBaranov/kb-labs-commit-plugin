@@ -15,6 +15,12 @@ export default defineHandler({
       // Resolve scope to actual directory path
       const scopeCwd = resolveScopePath(ctx.cwd, scope);
 
+      ctx.platform.logger.info('[git-status] Resolution', {
+        cwd: ctx.cwd,
+        scope,
+        scopeCwd,
+      });
+
       // Get git status (git runs FROM scopeCwd, no filtering)
       const status = await getGitStatus(scopeCwd);
 

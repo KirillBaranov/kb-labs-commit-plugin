@@ -1,8 +1,8 @@
 import { defineHandler, type RestInput, type PluginContextV3 } from '@kb-labs/sdk';
 import { loadPlan } from '@kb-labs/commit-core/storage';
 import { getGitStatus } from '@kb-labs/commit-core/analyzer';
+import { COMMIT_CACHE_PREFIX, type StatusResponse, type PlanStatus } from '@kb-labs/commit-contracts';
 import { resolveScopePath } from './scope-resolver';
-import type { StatusResponse } from '@kb-labs/commit-contracts';
 
 const STATUS_CACHE_TTL = 5000; // 5 seconds
 
@@ -16,20 +16,22 @@ export default defineHandler({
   async execute(ctx: PluginContextV3, input: RestInput<{ scope?: string }>): Promise<StatusResponse> {
     const scope = input.query?.scope || 'root';
 
-    try {
-      // Resolve scope to actual directory path
-      const scopeCwd = resolveScopePath(ctx.cwd, scope);
+    ctx.platform.logger.info(`[status-handler] Fetching status for scope: ${scope}`);
 
+    try {
       // Load current plan
       const plan = await loadPlan(ctx.cwd, scope);
+      ctx.platform.logger.info(`[status-handler] Plan loaded: ${!!plan}`);
 
       // Get git status (with platform cache)
       let filesChanged = 0;
       let gitStatus = null;
-      const cacheKey = `git-status:${scope}`;
+      const cacheKey = `${COMMIT_CACHE_PREFIX}git-status:${scope}`;
+      ctx.platform.logger.info(`[status-handler] Cache key: ${cacheKey}`);
 
       // Try to get from cache
       const cached = await ctx.platform.cache.get(cacheKey);
+      ctx.platform.logger.info(`[status-handler] Cache hit: ${!!cached}`);
 
       if (cached !== null && cached !== undefined) {
         // Use cached value
@@ -37,27 +39,54 @@ export default defineHandler({
         filesChanged = cachedData.count;
         gitStatus = cachedData.status;
       } else {
-        // Fetch fresh git status (git runs FROM scopeCwd)
-        try {
-          gitStatus = await getGitStatus(scopeCwd);
+        // Fetch fresh git status
+        // Resolve scope to actual directory path (same as files-handler)
+        const scopeCwd = resolveScopePath(ctx.cwd, scope);
+        ctx.platform.logger.info(`[status-handler] Resolved scope CWD: ${scopeCwd}`);
 
-          filesChanged =
-            gitStatus.staged.length +
-            gitStatus.unstaged.length +
-            gitStatus.untracked.length;
+        gitStatus = await getGitStatus(scopeCwd);
+        ctx.platform.logger.info(`[status-handler] Git status fetched - staged: ${gitStatus.staged.length}, unstaged: ${gitStatus.unstaged.length}, untracked: ${gitStatus.untracked.length}`);
 
-          // Store in cache with TTL
-          await ctx.platform.cache.set(cacheKey, { count: filesChanged, status: gitStatus }, STATUS_CACHE_TTL);
-        } catch (err) {
-          // Ignore git status errors
+        filesChanged =
+          gitStatus.staged.length +
+          gitStatus.unstaged.length +
+          gitStatus.untracked.length;
+
+        ctx.platform.logger.info(`[status-handler] Total files changed: ${filesChanged}`);
+
+        // Cache the result
+        await ctx.platform.cache.set(
+          cacheKey,
+          { count: filesChanged, status: gitStatus },
+          STATUS_CACHE_TTL
+        );
+      }
+
+      // Determine plan status
+      let planStatus: PlanStatus = 'idle';
+      let commitsApplied = 0;
+
+      if (plan) {
+        // Check if commits were applied (stored in cache after apply)
+        const appliedCacheKey = `${COMMIT_CACHE_PREFIX}plan-applied:${scope}`;
+        const appliedData = await ctx.platform.cache.get(appliedCacheKey);
+
+        if (appliedData) {
+          const applied = appliedData as { commitsApplied: number };
+          commitsApplied = applied.commitsApplied;
+          planStatus = 'applied';
+        } else {
+          planStatus = 'ready';
         }
       }
 
       return {
         scope,
         hasPlan: !!plan,
+        planStatus,
         filesChanged,
         commitsInPlan: plan?.commits.length || 0,
+        commitsApplied,
         planTimestamp: plan?.createdAt,
         gitStatus: gitStatus || undefined,
       };
@@ -65,8 +94,10 @@ export default defineHandler({
       return {
         scope,
         hasPlan: false,
+        planStatus: 'idle',
         filesChanged: 0,
         commitsInPlan: 0,
+        commitsApplied: 0,
       };
     }
   },

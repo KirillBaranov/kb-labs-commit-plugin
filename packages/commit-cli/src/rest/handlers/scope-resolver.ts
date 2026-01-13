@@ -18,14 +18,29 @@ export function resolveScopePath(baseCwd: string, scope: string = 'root'): strin
     return baseCwd;
   }
 
-  // Normalize scope to directory name
-  // '@kb-labs/mind' → 'kb-labs-mind'
-  // 'kb-labs-mind' → 'kb-labs-mind'
-  const normalized = scope
-    .replace(/^@/, '')           // Remove leading @
-    .replace(/\//g, '-')         // Replace / with -
-    .replace(/\*/g, '')          // Remove wildcards
-    .replace(/:/g, '-');         // Replace : with -
+  // Remove @ prefix first
+  let normalized = scope.replace(/^@/, '');
+
+  // Extract scope and package name
+  // '@kb-labs/kb-labs' → scope='kb-labs', pkg='kb-labs'
+  // '@kb-labs/mind' → scope='kb-labs', pkg='mind'
+  const parts = normalized.split('/');
+
+  if (parts.length === 2) {
+    const [scopeName, pkgName] = parts;
+    // If scope === package (e.g., @kb-labs/kb-labs), use just the scope name
+    if (scopeName === pkgName) {
+      normalized = scopeName;
+    } else {
+      // Otherwise combine: kb-labs-mind
+      normalized = `${scopeName}-${pkgName}`;
+    }
+  } else {
+    // Plain name without scope, just clean it up
+    normalized = normalized
+      .replace(/\*/g, '')          // Remove wildcards
+      .replace(/:/g, '-');         // Replace : with -
+  }
 
   return path.join(baseCwd, normalized);
 }

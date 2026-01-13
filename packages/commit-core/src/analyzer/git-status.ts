@@ -22,6 +22,7 @@ export async function getGitStatus(cwd: string, options: GitStatusOptions = {}):
   // Check if scope points to a nested git repository
   if (scope) {
     const nestedRepo = detectNestedRepo(cwd, scope);
+
     if (nestedRepo) {
       return getNestedRepoStatus(cwd, nestedRepo);
     }
@@ -45,11 +46,26 @@ export async function getGitStatus(cwd: string, options: GitStatusOptions = {}):
  * Returns the nested repo path if found, undefined otherwise
  */
 function detectNestedRepo(cwd: string, scope: string): string | undefined {
-  // Extract base directory from scope pattern
+  // Normalize package scope to directory name first
+  // '@kb-labs/release-manager' -> 'kb-labs-release-manager'
+  // '@kb-labs/mind/**' -> 'kb-labs-mind'
   // 'kb-labs-sdk/**' -> 'kb-labs-sdk'
   // 'packages/foo/**' -> 'packages/foo'
-  const baseDir = scope.split('/').filter(p => !p.includes('*'))[0];
-  if (!baseDir) return undefined;
+  const normalizedScope = scope
+    .replace(/^@/, '')           // Remove leading @
+    .replace(/\//g, '-')         // Replace / with -
+    .replace(/\*\*/g, '')        // Remove wildcards
+    .replace(/\/\*/g, '')        // Remove trailing /*
+    .replace(/-+$/, '')          // Remove trailing dashes
+    .trim();
+
+  // Extract base directory from normalized scope
+  // 'kb-labs-release-manager' -> 'kb-labs-release-manager'
+  // 'packages-foo' -> 'packages-foo'
+  const baseDir = normalizedScope.split('-').length > 0 ? normalizedScope : scope.split('/').filter(p => !p.includes('*'))[0];
+  if (!baseDir) {
+    return undefined;
+  }
 
   const nestedPath = join(cwd, baseDir);
   const nestedGit = join(nestedPath, '.git');

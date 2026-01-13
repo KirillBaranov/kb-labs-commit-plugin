@@ -27,7 +27,7 @@ export async function applyCommitPlan(
 
   // 1. Check for staleness (only for files in the plan, not entire repo)
   if (!options?.force) {
-    const staleness = await checkStaleness(cwd, plan);
+    const staleness = await checkStaleness(cwd, plan, options?.scope);
     if (staleness.isStale) {
       return {
         success: false,
@@ -175,7 +175,8 @@ export function formatCommitMessage(commit: CommitGroup, options?: { includeFoot
  */
 async function checkStaleness(
   cwd: string,
-  plan: CommitPlan
+  plan: CommitPlan,
+  scope?: string
 ): Promise<{ isStale: boolean; reason: string }> {
   const planFiles = new Set([
     ...plan.gitStatus.staged,
@@ -193,6 +194,8 @@ async function checkStaleness(
 
   // Check each repo for staleness
   for (const [repoPath, fileInfos] of filesByRepo) {
+    // Get current git status from the repo
+    // Note: repoPath already points to the correct git repository root
     const currentStatus = await getGitStatus(repoPath);
     const currentFiles = new Set(getAllChangedFiles(currentStatus));
 

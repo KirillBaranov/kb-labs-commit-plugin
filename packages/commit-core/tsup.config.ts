@@ -17,5 +17,5 @@ export default defineConfig({
   },
   clean: true,
   sourcemap: true,
-  external: ['@kb-labs/commit-contracts'],
+  external: ['@kb-labs/commit-contracts', '@kb-labs/sdk'],
 });

@@ -11,7 +11,7 @@ import { resolveScopePath } from './scope-resolver';
  * - Specific file changes (if file specified)
  */
 export default defineHandler({
-  async execute(ctx: PluginContextV3, input: RestInput<SummarizeRequest>): Promise<SummarizeResponse> {
+  async execute(ctx: PluginContextV3, input: RestInput<unknown, SummarizeRequest>): Promise<SummarizeResponse> {
     const logger = useLogger();
     const llm = useLLM();
 
@@ -114,7 +114,7 @@ Keep it concise and at a high level.`;
         tokensUsed: result.usage.promptTokens + result.usage.completionTokens,
       };
     } catch (error) {
-      logger.error('[summarize-handler] Error', { error });
+      logger.error('[summarize-handler] Error', error as Error);
       throw new Error(`Failed to summarize changes: ${error}`);
     }
   },

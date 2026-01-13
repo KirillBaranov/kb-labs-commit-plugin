@@ -4,7 +4,7 @@
 
 import type { CommitPlan, GitStatus, FileSummary, CommitGroup } from '@kb-labs/commit-contracts';
 import type { GenerateOptions } from '../types';
-import { useLogger, useAnalytics } from '@kb-labs/sdk';
+import { useLogger, useAnalytics, useLLM } from '@kb-labs/sdk';
 import { getGitStatus, getAllChangedFiles } from '../analyzer/git-status';
 import { getFileSummaries, getFileDiffs } from '../analyzer/file-summary';
 import { getRecentCommits } from '../analyzer/recent-commits';
@@ -37,10 +37,11 @@ const MAX_LLM_RETRIES = 2;
  * Generate a commit plan from current git changes
  */
 export async function generateCommitPlan(options: GenerateOptions): Promise<CommitPlan> {
-  const { cwd, scope, llmComplete, onProgress } = options;
+  const { cwd, scope, onProgress } = options;
 
   const logger = useLogger();
   const analytics = useAnalytics();
+  const llm = useLLM();
   const startTime = Date.now();
 
   // 1. Resolve scope first if provided
@@ -49,6 +50,7 @@ export async function generateCommitPlan(options: GenerateOptions): Promise<Comm
   let scopePathForGit: string | undefined;
   if (scope) {
     resolvedScope = await resolveScope(cwd, scope);
+
     // If scope resolved to a single package path, use it for nested repo detection
     if (resolvedScope.packagePaths.length === 1) {
       scopePathForGit = resolvedScope.packagePaths[0];
@@ -117,12 +119,13 @@ export async function generateCommitPlan(options: GenerateOptions): Promise<Comm
   let tokensUsed: number | undefined;
   let escalated = false;
 
-  if (llmComplete) {
+  if (llm) {
     try {
       // Phase 1: Generate with file summaries and pattern hints (with retry)
       const prompt = buildEnhancedPrompt(summaries, patternAnalysis, recentCommits);
+
       const result = await retryLLMCall(
-        () => llmComplete(prompt, {
+        () => llm.complete(prompt, {
           systemPrompt: SYSTEM_PROMPT,
           temperature: 0.3,
           maxTokens: 2000,
@@ -191,7 +194,7 @@ export async function generateCommitPlan(options: GenerateOptions): Promise<Comm
           });
           onProgress?.('Re-analyzing with diff context (Phase 2)...');
           const resultWithDiff = await retryLLMCall(
-            () => llmComplete(promptWithDiff, {
+            () => llm.complete(promptWithDiff, {
               systemPrompt: SYSTEM_PROMPT_WITH_DIFF,
               temperature: 0.3,
               maxTokens: maxTokensPhase2,
@@ -415,6 +418,13 @@ async function retryLLMCall(
       return result;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
+
+      // DEBUG: Log full error details
+      await logger.error(`🔍 LLM call failed (attempt ${attempt})`, lastError, {
+        errorName: lastError.name,
+        errorMessage: lastError.message,
+        errorStack: lastError.stack,
+      });
 
       // Extract error type for better user feedback
       const errorType = getErrorType(lastError);

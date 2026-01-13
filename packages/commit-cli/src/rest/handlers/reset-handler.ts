@@ -1,4 +1,4 @@
-import { defineHandler, type PluginContextV3 } from '@kb-labs/sdk';
+import { defineHandler, type PluginContextV3, type RestInput } from '@kb-labs/sdk';
 import {
   ResetResponseSchema,
   type ResetResponse,
@@ -11,8 +11,8 @@ import { clearPlan } from '@kb-labs/commit-core/storage';
  * Deletes the current commit plan.
  */
 export default defineHandler({
-  async execute(ctx: PluginContextV3, input: { scope?: string }): Promise<ResetResponse> {
-    const scope = input.scope || 'root';
+  async execute(ctx: PluginContextV3, input: RestInput<{ scope?: string }, unknown>): Promise<ResetResponse> {
+    const scope = input.query?.scope || 'root';
 
     try {
       await clearPlan(ctx.cwd, scope);

@@ -1,5 +1,6 @@
-import { defineHandler, type PluginContextV3 } from '@kb-labs/sdk';
+import { defineHandler, type PluginContextV3, type RestInput } from '@kb-labs/sdk';
 import {
+  COMMIT_CACHE_PREFIX,
   ApplyRequestSchema,
   ApplyResponseSchema,
   type ApplyRequest,
@@ -8,6 +9,7 @@ import {
 import { applyCommitPlan } from '@kb-labs/commit-core/applier';
 import { loadPlan } from '@kb-labs/commit-core/storage';
 import { resolveScopePath } from './scope-resolver';
+import { relative, normalize } from 'node:path';
 
 /**
  * POST /apply handler
@@ -15,27 +17,111 @@ import { resolveScopePath } from './scope-resolver';
  * Applies the current commit plan by creating git commits.
  */
 export default defineHandler({
-  async execute(ctx: PluginContextV3, input: ApplyRequest): Promise<ApplyResponse> {
-    const { scope = 'root', force } = input;
+  async execute(ctx: PluginContextV3, input: RestInput<unknown, ApplyRequest>): Promise<ApplyResponse> {
+    const { scope = 'root', force } = input.body ?? {};
+    const startTime = Date.now();
 
     try {
-      // Resolve scope to actual directory path
+      // Resolve scope to actual directory path (for nested git repos)
       const scopeCwd = resolveScopePath(ctx.cwd, scope);
 
-      // Load the plan first
+      // Load the plan first (plan stored in root, but paths are relative to repoRoot)
       const plan = await loadPlan(ctx.cwd, scope);
       if (!plan) {
         throw new Error('No commit plan found. Generate a plan first with POST /generate');
       }
 
-      // Apply commits (git runs FROM scopeCwd)
-      const result = await applyCommitPlan(scopeCwd, plan, { force });
+      // Transform file paths from repoRoot-relative to scopeCwd-relative
+      // Plan files: "kb-labs-commit-plugin/packages/commit-cli/src/file.ts"
+      // scopeCwd: "/absolute/path/kb-labs/kb-labs-commit-plugin"
+      // ctx.cwd: "/absolute/path/kb-labs"
+      // Need: "packages/commit-cli/src/file.ts"
+
+      // Use path.relative() for proper cross-platform path handling
+      const scopeRelative = normalize(relative(ctx.cwd, scopeCwd));
+
+      // Helper to strip scope prefix from file path
+      const stripScopePrefix = (filePath: string): string => {
+        // Normalize path separators (handles Windows vs Unix)
+        const normalizedPath = normalize(filePath);
+        const normalizedPrefix = normalize(scopeRelative);
+
+        // If file starts with scope prefix, strip it
+        if (normalizedPath.startsWith(normalizedPrefix + '/') ||
+            normalizedPath.startsWith(normalizedPrefix + '\\')) {
+          return normalizedPath.slice(normalizedPrefix.length + 1);
+        }
+
+        // If exact match (shouldn't happen for files, but handle it)
+        if (normalizedPath === normalizedPrefix) {
+          return '';
+        }
+
+        // File doesn't start with prefix - return as-is (shouldn't happen)
+        return filePath;
+      };
+
+      const transformedPlan = {
+        ...plan,
+        gitStatus: {
+          staged: plan.gitStatus.staged.map(stripScopePrefix),
+          unstaged: plan.gitStatus.unstaged.map(stripScopePrefix),
+          untracked: plan.gitStatus.untracked.map(stripScopePrefix),
+        },
+        commits: plan.commits.map(commit => ({
+          ...commit,
+          files: commit.files.map(stripScopePrefix),
+        })),
+      };
+
+      // Apply commits (git runs FROM scopeCwd, not ctx.cwd!)
+      const result = await applyCommitPlan(scopeCwd, transformedPlan, { force, scope });
+
+      // Store applied status in cache for status tracking
+      if (result.success) {
+        const appliedCacheKey = `${COMMIT_CACHE_PREFIX}plan-applied:${scope}`;
+        await ctx.platform.cache.set(
+          appliedCacheKey,
+          { commitsApplied: result.appliedCommits.length },
+          60 * 60 * 1000 // 1 hour TTL
+        );
+      }
+
+      // Track success/failure
+      if (ctx.platform.analytics) {
+        if (result.success) {
+          await ctx.platform.analytics.track('commit.apply.success', {
+            scope,
+            force,
+            commitsApplied: result.appliedCommits.length,
+            durationMs: Date.now() - startTime,
+          });
+        } else {
+          await ctx.platform.analytics.track('commit.apply.failed', {
+            scope,
+            force,
+            commitsApplied: result.appliedCommits.length,
+            errors: result.errors,
+            durationMs: Date.now() - startTime,
+          });
+        }
+      }
 
       return {
         result,
         scope,
       };
     } catch (error) {
+      // Track error
+      if (ctx.platform.analytics) {
+        await ctx.platform.analytics.track('commit.apply.error', {
+          scope,
+          force,
+          error: error instanceof Error ? error.message : String(error),
+          durationMs: Date.now() - startTime,
+        });
+      }
+
       throw new Error(`Failed to apply commits: ${error}`);
     }
   },

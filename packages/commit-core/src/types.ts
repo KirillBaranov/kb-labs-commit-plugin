@@ -25,22 +25,22 @@ export type {
 /**
  * Options for generating a commit plan
  *
- * Note: Debug logging is handled via useLogger() from SDK,
- * which can be called anywhere without passing logger through arguments.
+ * Note: Debug logging and LLM access are handled via SDK hooks (useLogger, useLLM),
+ * which can be called anywhere without passing through arguments.
  */
 export interface GenerateOptions {
   /** Working directory (repo root) */
   cwd: string;
   /** Optional scope pattern to filter files */
   scope?: string;
-  /** LLM completion function (if available) */
-  llmComplete?: LLMCompleteFunction;
   /** Recent commits for style reference */
   recentCommits?: string[];
   /** Plugin configuration (from kb.config.json + env) */
   config?: import('@kb-labs/commit-contracts').CommitPluginConfig;
   /** Progress callback for UI updates (updates spinner text) */
   onProgress?: (message: string) => void;
+  /** LLM completion function (optional - can be undefined if LLM disabled) */
+  llmComplete?: LLMCompleteFunction;
 }
 
 /**
@@ -49,6 +49,8 @@ export interface GenerateOptions {
 export interface ApplyOptions {
   /** Force apply even if working tree changed */
   force?: boolean;
+  /** Scope pattern to filter files (e.g., '@kb-labs/workflow', 'packages/core/**') */
+  scope?: string;
 }
 
 /**
@@ -59,6 +61,8 @@ export interface PushOptions {
   force?: boolean;
   /** Remote name (default: origin) */
   remote?: string;
+  /** Scope pattern to filter files (e.g., '@kb-labs/workflow', 'packages/core/**') */
+  scope?: string;
 }
 
 /**

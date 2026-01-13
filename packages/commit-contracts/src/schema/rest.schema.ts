@@ -37,15 +37,28 @@ export type ScopesResponse = z.infer<typeof ScopesResponseSchema>;
 // ============================================================================
 
 /**
+ * Plan status lifecycle
+ * - idle: No plan exists, need to generate
+ * - ready: Plan generated, ready to apply
+ * - applied: Plan applied as commits, ready to push
+ * - pushed: Commits pushed to remote
+ */
+export const PlanStatusSchema = z.enum(['idle', 'ready', 'applied', 'pushed']);
+
+export type PlanStatus = z.infer<typeof PlanStatusSchema>;
+
+/**
  * GET /status?scope=X response
  */
 export const StatusResponseSchema = z.object({
   scope: z.string().default('root'),
   hasPlan: z.boolean(),
+  planStatus: PlanStatusSchema.default('idle'),
   planTimestamp: z.string().datetime().optional(),
   gitStatus: GitStatusSchema.optional(),
   filesChanged: z.number().int().min(0).default(0),
   commitsInPlan: z.number().int().min(0).default(0),
+  commitsApplied: z.number().int().min(0).default(0),
 });
 
 export type StatusResponse = z.infer<typeof StatusResponseSchema>;

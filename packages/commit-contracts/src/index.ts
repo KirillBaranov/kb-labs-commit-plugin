@@ -22,3 +22,9 @@ export * from './env';
 export * from './routes';
 export * from './events';
 
+/**
+ * Cache key prefix for commit plugin
+ * Used for platform cache namespacing: commit:git-status:*, commit:plan-applied:*
+ */
+export const COMMIT_CACHE_PREFIX = 'commit:' as const;
+

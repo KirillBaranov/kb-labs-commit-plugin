@@ -22,6 +22,7 @@ import {
   COMMIT_ROUTES,
   COMMIT_WIDGET_ROUTES,
   COMMIT_EVENTS,
+  COMMIT_CACHE_PREFIX,
 } from '@kb-labs/commit-contracts';
 import {
   runFlags,
@@ -36,7 +37,7 @@ import {
  * Build permissions using presets:
  * - gitWorkflow: HOME, USER, GIT_*, SSH_* for git operations
  * - kbPlatform: KB_* env vars and .kb/ directory
- * - Custom: COMMIT_ENV_VARS, quotas
+ * - Custom: COMMIT_ENV_VARS, quotas, platform services (llm, cache)
  *
  * Note: LLM access goes through platform services, no direct API keys needed.
  */
@@ -47,6 +48,11 @@ const pluginPermissions = combinePermissions()
   .withFs({
     mode: 'readWrite',
     allow: ['.kb/commit/**'],
+  })
+  .withPlatform({
+    llm: true,              // Full LLM access for commit generation
+    cache: [COMMIT_CACHE_PREFIX], // Cache namespace prefix from contracts
+    analytics: true,        // Track commit generation events
   })
   .withQuotas({
     timeoutMs: 600000, // 10 min for LLM
@@ -67,7 +73,7 @@ export const manifest = {
 
   // Platform requirements (LLM is optional but preferred)
   platform: {
-    requires: ['storage'],
+    requires: ['storage', 'cache'],
     optional: ['llm', 'analytics', 'logger'],
   },
 

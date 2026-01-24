@@ -34,7 +34,7 @@
     "build": "tsup --config tsup.config.ts",
     "dev": "tsup --config tsup.config.ts --watch",
     "lint": "eslint src --ext .ts",
-    "lint:fix": "eslint src --ext .ts --fix",
+    "lint:fix": "eslint . --fix",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -43,7 +43,7 @@
     "@kb-labs/commit-contracts": "workspace:*",
     "@kb-labs/commit-core": "workspace:*",
     "@kb-labs/sdk": "link:../../../kb-labs-sdk/packages/sdk",
-    "glob": "^13.0.0"
+    "glob": "^11.0.0"
   },
   "devDependencies": {
     "@kb-labs/devkit": "link:../../../kb-labs-devkit",

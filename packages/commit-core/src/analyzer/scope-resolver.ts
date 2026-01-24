@@ -8,7 +8,7 @@
 
 import { readFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
-import { globby } from 'globby';
+import globby from 'globby';
 
 export interface ResolvedScope {
   /** Original scope string */

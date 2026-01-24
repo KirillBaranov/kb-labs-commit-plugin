@@ -52,7 +52,7 @@ export const commitFlags = defineFlags({
  *   'with-push': boolean;
  * }
  */
-export type CommitFlags = typeof commitFlags.type;
+export type CommitFlags = typeof commitFlags.infer;
 
 /**
  * Flags for commit:generate command
@@ -84,4 +84,4 @@ export const generateFlags = defineFlags({
  *   json: boolean;
  * }
  */
-export type GenerateFlags = typeof generateFlags.type;
+export type GenerateFlags = typeof generateFlags.infer;

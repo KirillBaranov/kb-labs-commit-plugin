@@ -1,5 +1,5 @@
 import { defineHandler, type PluginContextV3, type RestInput, useLogger } from '@kb-labs/sdk';
-import { FileDiffResponseSchema, type FileDiffResponse } from '@kb-labs/commit-contracts';
+import { type FileDiffResponse } from '@kb-labs/commit-contracts';
 import { getFileDiff } from '@kb-labs/commit-core/analyzer';
 import { resolveScopePath } from './scope-resolver';
 

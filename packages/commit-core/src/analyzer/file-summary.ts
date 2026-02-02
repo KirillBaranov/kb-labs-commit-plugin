@@ -2,13 +2,22 @@
  * File summary extraction
  */
 
-import { simpleGit, type SimpleGit, type DiffResultTextFile, type DiffResultBinaryFile } from 'simple-git';
-import type { FileSummary } from '@kb-labs/commit-contracts';
+/* eslint-disable no-await-in-loop -- Sequential git operations required: must check status, read diffs, compute summaries one-by-one for each file */
+
+import {
+  simpleGit,
+  type SimpleGit,
+  type DiffResultTextFile,
+  type DiffResultBinaryFile,
+} from "simple-git";
+import type { FileSummary } from "@kb-labs/commit-contracts";
 
 /**
  * Type guard for text file diff result
  */
-function isTextFile(file: DiffResultTextFile | DiffResultBinaryFile): file is DiffResultTextFile {
+function isTextFile(
+  file: DiffResultTextFile | DiffResultBinaryFile,
+): file is DiffResultTextFile {
   return !file.binary;
 }
 
@@ -34,7 +43,7 @@ async function isNewFile(cwd: string, filePath: string): Promise<boolean> {
     // git ls-tree HEAD -- <file>
     // Returns tree entry if file exists in HEAD, empty if file is new
     // This correctly handles modified/unstaged files (they exist in HEAD = not new)
-    const result = await git.raw(['ls-tree', 'HEAD', '--', repo.relativePath]);
+    const result = await git.raw(["ls-tree", "HEAD", "--", repo.relativePath]);
 
     // If no output, file doesn't exist in HEAD → truly new file
     // If has output, file exists in HEAD → not new (modified/unstaged)
@@ -49,7 +58,11 @@ async function isNewFile(cwd: string, filePath: string): Promise<boolean> {
  * Get file summaries with diff stats for given files
  * Supports nested git repositories by grouping files per repo
  */
-export async function getFileSummaries(cwd: string, files: string[]): Promise<FileSummary[]> {
+// eslint-disable-next-line sonarjs/cognitive-complexity -- File summary extraction: groups files by repo, handles nested git repos, computes diff stats, processes staged/unstaged/untracked files
+export async function getFileSummaries(
+  cwd: string,
+  files: string[],
+): Promise<FileSummary[]> {
   if (files.length === 0) {
     return [];
   }
@@ -57,7 +70,10 @@ export async function getFileSummaries(cwd: string, files: string[]): Promise<Fi
   const summaries: FileSummary[] = [];
 
   // Group files by repository (walks up directory tree to find .git)
-  const filesByRepo = new Map<string, { repoPath: string; relativePath: string; originalPath: string }[]>();
+  const filesByRepo = new Map<
+    string,
+    { repoPath: string; relativePath: string; originalPath: string }[]
+  >();
 
   for (const file of files) {
     const repo = await findGitRepo(cwd, file);
@@ -72,7 +88,11 @@ export async function getFileSummaries(cwd: string, files: string[]): Promise<Fi
 
     // Group by repository path
     const group = filesByRepo.get(repo.repoPath) ?? [];
-    group.push({ repoPath: repo.repoPath, relativePath: repo.relativePath, originalPath: file });
+    group.push({
+      repoPath: repo.repoPath,
+      relativePath: repo.relativePath,
+      originalPath: file,
+    });
     filesByRepo.set(repo.repoPath, group);
   }
 
@@ -83,13 +103,20 @@ export async function getFileSummaries(cwd: string, files: string[]): Promise<Fi
 
     try {
       // Try staged diff first
-      const stagedDiff = await git.diffSummary(['--cached', '--', ...relativePaths]);
+      const stagedDiff = await git.diffSummary([
+        "--cached",
+        "--",
+        ...relativePaths,
+      ]);
 
       // Then try unstaged diff (working tree changes)
-      const unstagedDiff = await git.diffSummary(['--', ...relativePaths]);
+      const unstagedDiff = await git.diffSummary(["--", ...relativePaths]);
 
       // Combine results (prefer staged if file appears in both)
-      const allDiffFiles = new Map<string, DiffResultTextFile | DiffResultBinaryFile>();
+      const allDiffFiles = new Map<
+        string,
+        DiffResultTextFile | DiffResultBinaryFile
+      >();
       for (const file of unstagedDiff.files) {
         allDiffFiles.set(file.file, file);
       }
@@ -102,7 +129,9 @@ export async function getFileSummaries(cwd: string, files: string[]): Promise<Fi
       for (const file of allDiffFiles.values()) {
         // Find original path (with repo prefix)
         const fileInfo = fileInfos.find((f) => f.relativePath === file.file);
-        if (!fileInfo) continue;
+        if (!fileInfo) {
+          continue;
+        }
 
         // Check if file is truly new (using repoPath as cwd)
         const isNew = await isNewFile(repoPath, file.file);
@@ -121,7 +150,7 @@ export async function getFileSummaries(cwd: string, files: string[]): Promise<Fi
           // Binary file
           summaries.push({
             path: fileInfo.originalPath,
-            status: 'modified',
+            status: "modified",
             additions: 0,
             deletions: 0,
             binary: true,
@@ -131,14 +160,18 @@ export async function getFileSummaries(cwd: string, files: string[]): Promise<Fi
       }
 
       // Add any missing files from this repo (untracked - not in git yet)
-      const processedPaths = new Set(Array.from(allDiffFiles.values()).map((f) => f.file));
-      const missingInRepo = fileInfos.filter((f) => !processedPaths.has(f.relativePath));
+      const processedPaths = new Set(
+        Array.from(allDiffFiles.values()).map((f) => f.file),
+      );
+      const missingInRepo = fileInfos.filter(
+        (f) => !processedPaths.has(f.relativePath),
+      );
 
       for (const fileInfo of missingInRepo) {
         // Untracked files are always new (never existed in git)
         summaries.push({
           path: fileInfo.originalPath,
-          status: 'added',
+          status: "added",
           additions: 0,
           deletions: 0,
           binary: false,
@@ -150,7 +183,7 @@ export async function getFileSummaries(cwd: string, files: string[]): Promise<Fi
       for (const fileInfo of fileInfos) {
         summaries.push({
           path: fileInfo.originalPath,
-          status: 'modified',
+          status: "modified",
           additions: 0,
           deletions: 0,
           binary: false,
@@ -166,15 +199,18 @@ export async function getFileSummaries(cwd: string, files: string[]): Promise<Fi
 /**
  * Map insertions/deletions to status
  */
-function mapDiffStatus(insertions: number, deletions: number): FileSummary['status'] {
+function mapDiffStatus(
+  insertions: number,
+  deletions: number,
+): FileSummary["status"] {
   // Simple heuristic: if only insertions, likely added; if only deletions, likely deleted
   if (deletions === 0 && insertions > 0) {
-    return 'added';
+    return "added";
   }
   if (insertions === 0 && deletions > 0) {
-    return 'deleted';
+    return "deleted";
   }
-  return 'modified';
+  return "modified";
 }
 
 /**
@@ -182,7 +218,7 @@ function mapDiffStatus(insertions: number, deletions: number): FileSummary['stat
  */
 export function formatFileSummary(summary: FileSummary): string {
   const stats = summary.binary
-    ? 'binary'
+    ? "binary"
     : `+${summary.additions}/-${summary.deletions}`;
   return `${summary.path} (${summary.status}, ${stats})`;
 }
@@ -192,7 +228,11 @@ export function formatFileSummary(summary: FileSummary): string {
  * Used when LLM requests more context (Phase 2 escalation)
  * Supports nested git repositories (files with prefix like 'kb-labs-sdk/...')
  */
-export async function getFileDiffs(cwd: string, files: string[]): Promise<Map<string, string>> {
+// eslint-disable-next-line sonarjs/cognitive-complexity -- Diff extraction: groups files by nested repo, handles staged/unstaged diffs, processes binary files, merges results
+export async function getFileDiffs(
+  cwd: string,
+  files: string[],
+): Promise<Map<string, string>> {
   if (files.length === 0) {
     return new Map();
   }
@@ -200,7 +240,10 @@ export async function getFileDiffs(cwd: string, files: string[]): Promise<Map<st
   const diffs = new Map<string, string>();
 
   // Group files by repository (walks up directory tree to find .git)
-  const filesByRepo = new Map<string, { repoPath: string; relativePath: string; originalPath: string }[]>();
+  const filesByRepo = new Map<
+    string,
+    { repoPath: string; relativePath: string; originalPath: string }[]
+  >();
 
   for (const file of files) {
     const repo = await findGitRepo(cwd, file);
@@ -215,7 +258,11 @@ export async function getFileDiffs(cwd: string, files: string[]): Promise<Map<st
 
     // Group by repository path
     const group = filesByRepo.get(repo.repoPath) ?? [];
-    group.push({ repoPath: repo.repoPath, relativePath: repo.relativePath, originalPath: file });
+    group.push({
+      repoPath: repo.repoPath,
+      relativePath: repo.relativePath,
+      originalPath: file,
+    });
     filesByRepo.set(repo.repoPath, group);
   }
 
@@ -226,13 +273,13 @@ export async function getFileDiffs(cwd: string, files: string[]): Promise<Map<st
     for (const { relativePath, originalPath } of fileInfos) {
       try {
         // Try staged diff first, then unstaged
-        let diff = await git.diff(['--cached', '--', relativePath]);
+        let diff = await git.diff(["--cached", "--", relativePath]);
         if (!diff) {
-          diff = await git.diff(['--', relativePath]);
+          diff = await git.diff(["--", relativePath]);
         }
         if (!diff) {
           // For untracked files, try to read content
-          diff = await git.show([`:${relativePath}`]).catch(() => '');
+          diff = await git.show([`:${relativePath}`]).catch(() => "");
         }
         if (diff) {
           diffs.set(originalPath, diff);
@@ -251,7 +298,7 @@ export async function getFileDiffs(cwd: string, files: string[]): Promise<Map<st
  */
 async function existsAsync(path: string): Promise<boolean> {
   try {
-    const { existsSync } = await import('node:fs');
+    const { existsSync } = await import("node:fs");
     return existsSync(path);
   } catch {
     return false;
@@ -277,9 +324,9 @@ async function existsAsync(path: string): Promise<boolean> {
  */
 async function findGitRepo(
   basePath: string,
-  filePath: string
+  filePath: string,
 ): Promise<{ repoPath: string; relativePath: string } | null> {
-  const segments = filePath.split('/');
+  const segments = filePath.split("/");
 
   // Try progressively shorter paths (walk up the tree)
   // For 'kb-labs-commit/packages/core/src/index.ts', try:
@@ -291,12 +338,12 @@ async function findGitRepo(
 
   for (let i = segments.length - 1; i > 0; i--) {
     const potentialRepoSegments = segments.slice(0, i);
-    const potentialRepoPath = `${basePath}/${potentialRepoSegments.join('/')}`;
+    const potentialRepoPath = `${basePath}/${potentialRepoSegments.join("/")}`;
     const gitDir = `${potentialRepoPath}/.git`;
 
     if (await existsAsync(gitDir)) {
       // Found a .git directory - this is the repo root
-      const relativePath = segments.slice(i).join('/');
+      const relativePath = segments.slice(i).join("/");
       return { repoPath: potentialRepoPath, relativePath };
     }
   }

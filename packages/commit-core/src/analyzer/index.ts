@@ -9,15 +9,20 @@ export {
   hasChanges,
   getCurrentBranch,
   isProtectedBranch,
-} from './git-status';
+} from "./git-status";
 
-export { getFileSummaries, formatFileSummary } from './file-summary';
+export { getFileSummaries, formatFileSummary } from "./file-summary";
 
-export { getFileDiff, type FileDiff } from './file-diff';
+export { getFileDiff, type FileDiff } from "./file-diff";
 
-export { getRecentCommits, detectCommitStyle } from './recent-commits';
+export { getRecentCommits, detectCommitStyle } from "./recent-commits";
 
-export { resolveScope, matchesScope, type ResolvedScope, type PackageInfo } from './scope-resolver';
+export {
+  resolveScope,
+  matchesScope,
+  type ResolvedScope,
+  type PackageInfo,
+} from "./scope-resolver";
 
 export {
   isSecretFile,
@@ -25,4 +30,8 @@ export {
   detectSecretFiles,
   detectSecretsInDiffs,
   formatSecretsWarning,
-} from './secrets-detector';
+  SecretsDetectedError,
+  detectSecretsWithLocation,
+  formatSecretsReport,
+  type SecretMatch,
+} from "./secrets-detector";

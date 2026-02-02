@@ -26,6 +26,17 @@ CRITICAL GROUPING RULES:
 - Ask yourself: "Would a developer make these changes in separate commits?" If no, group them!
 - CRITICAL: Each file must appear in EXACTLY ONE commit - no duplicates across commits!
 
+CRITICAL: FILE TYPE SHORTCUTS (check FIRST, before other rules):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚫 STOP! Check file extensions BEFORE asking questions below:
+
+📝 ALL files are *.md or *.mdx? → Type: docs (SKIP all questions below!)
+🧪 ALL files in test/, __tests__/, *.test.ts, *.spec.ts? → Type: test
+❌ If ANY file has code (.ts, .js, .tsx, .jsx, .py, etc.) → Continue to questions below
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 CRITICAL COMMIT TYPE CLASSIFICATION:
 For EACH commit, you MUST answer these questions to determine the correct type:
 
@@ -62,7 +73,55 @@ Rules:
 7. Scope should reflect the affected area (e.g., "cli", "api"), not individual files
 8. CRITICAL: If ALL files in a commit have status "deleted", use type "chore" or "refactor", NOT "feat"
 9. CRITICAL: If a commit is mostly deletions (>80% deletions), use "refactor" or "chore", NOT "feat"
-10. CRITICAL: IsNewFile flag determines STRONG BIAS against feat:
+
+10. CRITICAL: WRITE INFORMATIVE COMMIT MESSAGES (not generic):
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    ❌ BAD (too generic):
+    - "add feature"
+    - "update files"
+    - "refactor code"
+    - "fix bug"
+    - "improve types"
+
+    ✅ GOOD (specific and descriptive):
+    - "add JWT authentication with refresh token support"
+    - "update TypeScript configuration for strict mode"
+    - "refactor plugin execution to use factory pattern"
+    - "fix null pointer exception in authentication middleware"
+    - "improve type safety in workflow execution context"
+
+    Guidelines:
+    - Include WHAT was changed (specific feature/component)
+    - Include HOW if relevant (method, pattern, technology)
+    - Use concrete nouns (not "files", "code", "feature")
+    - Add context that helps reviewers understand the change
+    - For body: list specific changes, not just file names
+
+11. CRITICAL: SPECIFIC TYPE DETECTION (check BEFORE defaulting to refactor):
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    📝 docs: Documentation ONLY (no code changes)
+    ✅ ALL files are markdown (*.md, *.mdx) → docs (even if IsNewFile: true)
+    ✅ README.md, CONTRIBUTING.md, API docs, ADRs
+    ✅ Files in docs/ or doc/ directory with only markdown
+    ✅ JSDoc comments only (no logic changes)
+    ❌ NOT docs if ANY file has code logic changes
+
+    **IMPORTANT**: If ALL files end with .md or .mdx → ALWAYS use docs, NEVER feat!
+
+    🐛 fix: Corrects BROKEN functionality
+    ✅ Bug fixes, error handling corrections
+    ✅ Fixes crashes, incorrect behavior
+    ✅ Corrects typos in USER-FACING text (not code comments)
+    ❌ NOT fix if adding new behavior (that's feat)
+
+    🧪 test: Test files ONLY
+    ✅ Files in test/, tests/, __tests__/, *.test.ts, *.spec.ts
+    ✅ Adding/updating test cases
+    ❌ NOT test if also changing source code
+
+12. CRITICAL: IsNewFile flag determines STRONG BIAS against feat:
 
     IsNewFile: FALSE (modified existing file):
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -100,17 +159,17 @@ EXACT JSON SCHEMA (copy this structure):
     {
       "id": "c1",
       "type": "feat",
-      "scope": "area-scope",
-      "message": "short description of the logical change",
-      "body": "- affected file 1\\n- affected file 2",
-      "files": ["file1.ts", "file2.ts", "file3.ts"],
+      "scope": "auth",
+      "message": "add JWT authentication with refresh token support",
+      "body": "- implement JWT token generation and validation\\n- add refresh token rotation mechanism\\n- integrate with existing user authentication flow",
+      "files": ["src/auth/jwt-strategy.ts", "src/auth/refresh-token.ts", "src/middleware/auth.ts"],
       "releaseHint": "minor",
       "breaking": false,
       "reasoning": {
         "newBehavior": true,
         "fixesBug": false,
         "internalOnly": false,
-        "explanation": "Adds new authentication capability that users can configure",
+        "explanation": "Adds new JWT authentication capability with refresh tokens - enables secure stateless authentication for API users",
         "confidence": 0.85
       }
     }
@@ -206,6 +265,40 @@ Files: 5 new files with isNewFile: true
   - ... (3 more new files)
 ✅ CORRECT: feat(auth): add JWT authentication
 Reason: New functionality, truly new files, implements new capability
+
+Example 6: Documentation ONLY → docs, NOT chore or feat
+Files:
+  - README.md (modified, +50/-20, isNewFile: false)
+  - CONTRIBUTING.md (modified, +30/-10, isNewFile: false)
+  - docs/api.md (modified, +100/-50, isNewFile: false)
+❌ WRONG: chore(docs): update documentation files
+❌ WRONG: feat(docs): add documentation
+✅ CORRECT: docs: improve README and API documentation
+Reason: ALL files are markdown = docs (regardless of IsNewFile)
+
+Example 6b: NEW documentation files → docs, NOT feat
+Files:
+  - docs/benchmarks/README.md (added, +200/-0, isNewFile: true)
+  - docs/benchmarks/RESULTS.md (added, +100/-0, isNewFile: true)
+❌ WRONG: feat(docs): add benchmarks documentation
+✅ CORRECT: docs(benchmarks): add benchmarks documentation
+Reason: ALL files are .md = docs type (even if IsNewFile: true)
+
+Example 7: Bug fix with error handling → fix, NOT refactor
+Files:
+  - src/api/auth.ts (modified, +15/-5, isNewFile: false)
+  Diff shows: Added try-catch, null check for token validation
+❌ WRONG: refactor(api): update auth token validation
+✅ CORRECT: fix(api): handle null token in authentication
+Reason: Adds error handling to prevent crash = bug fix
+
+Example 8: Test files ONLY → test, NOT chore
+Files:
+  - tests/auth.test.ts (added, +200/-0, isNewFile: true)
+  - tests/fixtures/users.json (added, +50/-0, isNewFile: true)
+❌ WRONG: chore(tests): add test files
+✅ CORRECT: test(auth): add authentication test suite
+Reason: Test files only = test type
 `;
 
 /**
@@ -235,6 +328,17 @@ CRITICAL GROUPING RULES:
 - Target: 3-8 commits for <50 files, 5-12 commits for 50-150 files, 10-20 commits for 150+ files
 - Only separate genuinely DIFFERENT changes
 - CRITICAL: Each file must appear in EXACTLY ONE commit - no duplicates across commits!
+
+CRITICAL: FILE TYPE SHORTCUTS (check FIRST, before other rules):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚫 STOP! Check file extensions in DIFF BEFORE asking questions below:
+
+📝 ALL files in diff are *.md or *.mdx? → Type: docs (SKIP all questions below!)
+🧪 ALL files in diff are test/, __tests__/, *.test.ts, *.spec.ts? → Type: test
+❌ If ANY file has code (.ts, .js, .tsx, .jsx, .py, etc.) → Continue to questions below
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 CRITICAL COMMIT TYPE CLASSIFICATION (same as Phase 1):
 For EACH commit, answer these questions using the DIFF content:
@@ -293,8 +397,57 @@ Rules:
 7. Scope should reflect the affected area (e.g., "cli", "api"), not individual files
 8. CRITICAL: If ALL files in a commit are being DELETED (only deletions in diff), use type "chore" or "refactor", NOT "feat"
 9. CRITICAL: If a commit is mostly deletions (>80% of lines are deletions), use "refactor" or "chore", NOT "feat"
-10. IsNewFile flag (see RULE 0 above for detailed logic):
-    - IsNewFile: false → refactor/fix/chore (NOT feat)
+
+10. CRITICAL: WRITE INFORMATIVE COMMIT MESSAGES (look at diff content):
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    ❌ BAD (too generic):
+    - "add feature"
+    - "update files"
+    - "refactor code"
+    - "fix bug"
+    - "improve implementation"
+
+    ✅ GOOD (specific, based on diff):
+    - "add rate limiting middleware with Redis backend"
+    - "update API client to support pagination parameters"
+    - "refactor workflow executor to use async/await pattern"
+    - "fix memory leak in event listener cleanup"
+    - "improve error handling in authentication flow"
+
+    Guidelines:
+    - Read the DIFF to understand WHAT changed
+    - Include specific component/module names from diff
+    - Mention the technology/pattern if relevant (Redis, JWT, factory pattern)
+    - For body: describe concrete changes, not just "update X file"
+    - Use technical terms that developers will understand
+
+12. CRITICAL: SPECIFIC TYPE DETECTION (check diff content BEFORE defaulting to refactor):
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    📝 docs: Documentation ONLY (no code logic changes)
+    ✅ ALL files in diff are markdown (*.md, *.mdx) → docs (even if IsNewFile: true)
+    ✅ Diff shows ONLY markdown content changes
+    ✅ README.md, ADR files, API docs, benchmarks docs
+    ✅ Files in docs/ or doc/ directory with only markdown
+    ❌ NOT docs if diff includes ANY code logic changes
+
+    **IMPORTANT**: If ALL files end with .md or .mdx → ALWAYS use docs, NEVER feat!
+
+    🐛 fix: Corrects BROKEN functionality (look for bug-fix patterns in diff)
+    ✅ Diff adds try-catch, null checks, validation
+    ✅ Diff fixes incorrect calculations or logic errors
+    ✅ Diff corrects typos in user-facing strings
+    ✅ Commit message/body mentions "fix", "bug", "error", "crash"
+    ❌ NOT fix if adding new behavior
+
+    🧪 test: Test files ONLY
+    ✅ Diff shows files in test/, __tests__/, *.test.ts, *.spec.ts
+    ✅ Adding test cases, updating test fixtures
+    ❌ NOT test if diff also changes source code
+
+13. IsNewFile flag (see RULE 0 above for detailed logic):
+    - IsNewFile: false → refactor/fix/chore/docs/test (NOT feat)
     - IsNewFile: true → might be feat (check diff)
 
 EXACT JSON SCHEMA (copy this structure):
@@ -303,17 +456,17 @@ EXACT JSON SCHEMA (copy this structure):
     {
       "id": "c1",
       "type": "refactor",
-      "scope": "area-scope",
-      "message": "short description based on actual changes",
-      "body": "- what changed\\n- why it changed",
-      "files": ["file1.ts", "file2.ts", "file3.ts"],
+      "scope": "workflow",
+      "message": "extract job executor to separate class with dependency injection",
+      "body": "- create JobExecutor class with injectable dependencies\\n- move execution logic from runtime to executor\\n- add unit tests for isolated executor behavior",
+      "files": ["src/runtime/workflow-runtime.ts", "src/executor/job-executor.ts", "tests/executor.test.ts"],
       "releaseHint": "patch",
       "breaking": false,
       "reasoning": {
         "newBehavior": false,
         "fixesBug": false,
         "internalOnly": true,
-        "explanation": "Diff shows function extraction and renaming - internal restructuring without behavior change",
+        "explanation": "Diff shows extraction of JobExecutor class from runtime - improves testability through dependency injection pattern, no user-facing changes",
         "confidence": 0.95
       }
     }
@@ -330,16 +483,16 @@ EXAMPLE OUTPUT (based on actual diff content):
       "id": "c1",
       "type": "refactor",
       "scope": "cli",
-      "message": "restructure command routing and plugin discovery",
-      "body": "- reorganize command routing logic\\n- extract plugin discovery to separate module\\n- update tests to reflect new structure",
-      "files": ["src/commands/routing.ts", "src/plugins/discovery.ts", "src/__tests__/routing.test.ts"],
+      "message": "migrate command routing to builder pattern with fluent API",
+      "body": "- replace imperative routing with CommandRouterBuilder\\n- add fluent API for route registration (addRoute, withMiddleware)\\n- extract plugin discovery to PluginDiscoveryService class\\n- update integration tests for new routing pattern",
+      "files": ["src/commands/routing.ts", "src/commands/router-builder.ts", "src/plugins/discovery-service.ts", "tests/integration/routing.test.ts"],
       "releaseHint": "patch",
       "breaking": false,
       "reasoning": {
         "newBehavior": false,
         "fixesBug": false,
         "internalOnly": true,
-        "explanation": "IsNewFile: false for all files. Diff shows code extraction and reorganization - no new user-facing behavior",
+        "explanation": "IsNewFile: false for routing.ts (modified). Diff shows refactoring to builder pattern - improves code organization and testability without changing CLI behavior",
         "confidence": 0.95
       }
     }
@@ -371,6 +524,40 @@ Example 4: Bug fix in existing files
 Diff shows: Fix null pointer exception, add validation check
 ✅ CORRECT: fix(auth): handle null token in authentication middleware
 Reason: Fixing broken functionality = fix, not feat
+
+Example 5: Documentation ONLY → docs, NOT chore or feat
+Files:
+  - README.md (modified, +50/-20, IsNewFile: false)
+  - docs/API.md (modified, +30/-10, IsNewFile: false)
+Diff shows: Updated markdown content, improved examples, no code changes
+❌ WRONG: chore(docs): update documentation
+❌ WRONG: feat(docs): add documentation
+✅ CORRECT: docs: improve README and API documentation
+Reason: ALL files are markdown = docs (regardless of IsNewFile)
+
+Example 5b: NEW documentation files → docs, NOT feat
+Files:
+  - docs/benchmarks/README.md (added, +200/-0, IsNewFile: true)
+  - docs/benchmarks/RESULTS.md (added, +100/-0, IsNewFile: true)
+Diff shows: New markdown files with benchmarks documentation
+❌ WRONG: feat(docs): add benchmarks documentation
+✅ CORRECT: docs(benchmarks): add benchmarks documentation
+Reason: ALL files are .md = docs type (even if IsNewFile: true)
+
+Example 6: Bug fix with error handling → fix, NOT refactor
+Files:
+  - src/api/auth.ts (modified, +15/-5, IsNewFile: false)
+Diff shows: Added try-catch around token validation, null check before access
+✅ CORRECT: fix(api): handle null token in authentication
+Reason: Adds error handling to prevent crash = bug fix
+
+Example 7: Test files ONLY → test, NOT chore
+Files:
+  - tests/auth.test.ts (added, +200/-0, IsNewFile: true)
+  - tests/helpers/mock-data.ts (added, +50/-0, IsNewFile: true)
+Diff shows: New test suites for authentication module
+✅ CORRECT: test(auth): add authentication test suite
+Reason: Test files only = test type
 `;
 
 /**
@@ -568,6 +755,7 @@ export function parseResponse(
   }
 
   // Step 4: Validate and normalize each commit
+  // eslint-disable-next-line sonarjs/cognitive-complexity -- Commit validation: checks required fields (type/files/message), normalizes types, validates file arrays, handles edge cases
   const commits = parsed.commits.map((commit: Record<string, unknown>, index: number) => {
     // Validate required fields
     if (!commit.type) {
@@ -650,6 +838,7 @@ export function parseResponse(
  * Fix commit type based on file status heuristics and pattern analysis
  * Prevents LLM from marking deletions as 'feat', refactoring as 'feat', etc.
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- Type correction logic: checks deletion-only commits, test files, package.json changes, small refactors, and applies pattern-based rules
 function fixCommitType<T extends CommitGroup & { confidence: number }>(
   commit: T,
   summaries: FileSummary[],

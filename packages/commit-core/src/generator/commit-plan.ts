@@ -2,15 +2,17 @@
  * Main commit plan generator
  */
 
+/* eslint-disable no-await-in-loop -- Sequential LLM calls and git operations required for commit plan generation phases */
+
 import type { CommitPlan, GitStatus, FileSummary, CommitGroup } from '@kb-labs/commit-contracts';
 import type { GenerateOptions } from '../types';
-import { useLogger, useAnalytics, useLLM } from '@kb-labs/sdk';
+import { useLogger, useAnalytics, useLLM, type LLMMessage } from '@kb-labs/sdk';
+import { COMMIT_PLAN_TOOL, COMMIT_PLAN_TOOL_PHASE3 } from './commit-tools';
 import { getGitStatus, getAllChangedFiles } from '../analyzer/git-status';
 import { getFileSummaries, getFileDiffs } from '../analyzer/file-summary';
 import { getRecentCommits } from '../analyzer/recent-commits';
 import { resolveScope, matchesScope, type ResolvedScope } from '../analyzer/scope-resolver';
 import {
-  buildPrompt,
   buildPromptWithDiff,
   buildEnhancedPrompt,
   parseResponse,
@@ -23,9 +25,13 @@ import { analyzePatterns, type PatternAnalysis } from './pattern-detector';
 import { minimatch } from 'minimatch';
 import {
   detectSecretFiles,
-  detectSecretsInDiffs,
+  detectSecretsWithLocation,
   formatSecretsWarning,
+  formatSecretsReport,
+  SecretsDetectedError,
+  type SecretMatch,
 } from '../analyzer/secrets-detector';
+import { promptUserConfirmation } from '../utils/prompt';
 
 /** Confidence threshold - below this we escalate to Phase 2 with diff */
 const CONFIDENCE_THRESHOLD = 0.7;
@@ -36,6 +42,7 @@ const MAX_LLM_RETRIES = 2;
 /**
  * Generate a commit plan from current git changes
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- Main orchestrator: scope resolution, git status, file analysis, LLM phases (1 & 2), validation, retry logic, heuristics, anti-hallucination checks
 export async function generateCommitPlan(options: GenerateOptions): Promise<CommitPlan> {
   const { cwd, scope, onProgress } = options;
 
@@ -77,14 +84,53 @@ export async function generateCommitPlan(options: GenerateOptions): Promise<Comm
   const secretFiles = detectSecretFiles(allFiles);
 
   if (secretFiles.length > 0) {
+    // Create basic matches for secret files (no location info yet - just filenames)
+    const basicMatches: SecretMatch[] = secretFiles.map(file => ({
+      file,
+      line: 0,
+      column: 0,
+      pattern: 'SECRET_FILE_PATTERN',
+      patternName: 'Secret File Pattern',
+      snippet: '',
+      matchedText: file,
+    }));
+
     const warning = formatSecretsWarning(secretFiles);
-    await logger.error('🚨 SECRETS DETECTED - ABORTING COMMIT GENERATION', new Error('Secrets detected'), {
+    await logger.error('🚨 SECRETS DETECTED', new Error('Secrets detected'), {
       secretFiles,
     });
     console.error('\n' + warning + '\n');
 
-    // ABORT - do not create any commits with secrets
-    throw new Error(`Secrets detected in ${secretFiles.length} file(s). Cannot proceed with commit generation. Add these files to .gitignore or remove secrets before committing.`);
+    // Check if --allow-secrets flag is set
+    if (!options.allowSecrets) {
+      // No bypass flag - ABORT immediately
+      throw new SecretsDetectedError(
+        basicMatches,
+        `Secrets detected in ${secretFiles.length} file(s). Use --allow-secrets to bypass after review, or add files to .gitignore.`
+      );
+    }
+
+    // --allow-secrets flag is set - ask for user confirmation
+    console.log('\n⚠️  WARNING: --allow-secrets flag detected\n');
+    const confirmed = await promptUserConfirmation(
+      `⚠️  Proceed with committing ${secretFiles.length} file(s) that may contain secrets?`,
+      false // default: NO
+    );
+
+    if (!confirmed) {
+      // User declined - ABORT
+      throw new SecretsDetectedError(
+        basicMatches,
+        'User declined to commit files with potential secrets.'
+      );
+    }
+
+    // User confirmed - log warning and continue
+    await logger.warn('User confirmed to proceed with files containing potential secrets', {
+      secretFiles,
+      confirmedAt: new Date().toISOString(),
+    });
+    console.log('✅ User confirmed - continuing with commit generation...\n');
   }
 
   // 4. Get file summaries (diff stats)
@@ -121,23 +167,50 @@ export async function generateCommitPlan(options: GenerateOptions): Promise<Comm
 
   if (llm) {
     try {
-      // Phase 1: Generate with file summaries and pattern hints (with retry)
-      const prompt = buildEnhancedPrompt(summaries, patternAnalysis, recentCommits);
+      // Check if LLM supports native tools (chatWithTools)
+      const supportsNativeTools = typeof llm.chatWithTools === 'function';
 
-      const result = await retryLLMCall(
-        () => llm.complete(prompt, {
-          systemPrompt: SYSTEM_PROMPT,
-          temperature: 0.3,
-          maxTokens: 2000,
-        }),
-        'Phase 1',
-        logger,
-        onProgress
-      );
+      let parsed: ParsedLLMResponse;
 
-      let parsed = parseResponse(result.content, summaries, patternAnalysis);
-      llmUsed = true;
-      tokensUsed = result.tokensUsed;
+      if (supportsNativeTools) {
+        // NEW: Use native tools approach (guaranteed structured output)
+        await logger.debug('Using native tools approach (chatWithTools)');
+        onProgress?.('Analyzing with native tools...');
+
+        const result = await generateWithNativeTools(
+          llm,
+          summaries,
+          patternAnalysis,
+          recentCommits,
+          logger,
+          onProgress
+        );
+
+        parsed = result.parsed;
+        tokensUsed = result.tokensUsed;
+        llmUsed = true;
+      } else {
+        // FALLBACK: Text-based parsing for LLMs without chatWithTools support
+        await logger.debug('Using text-based parsing (fallback)');
+        onProgress?.('Analyzing with text-based LLM...');
+
+        const prompt = buildEnhancedPrompt(summaries, patternAnalysis, recentCommits);
+
+        const result = await retryLLMCall(
+          () => llm.complete(prompt, {
+            systemPrompt: SYSTEM_PROMPT,
+            temperature: 0.3,
+            maxTokens: 2000,
+          }),
+          'Phase 1',
+          logger,
+          onProgress
+        );
+
+        parsed = parseResponse(result.content, summaries, patternAnalysis);
+        llmUsed = true;
+        tokensUsed = result.tokensUsed;
+      }
 
       // Phase 2: Escalate if LLM requests more context, confidence is low, or 10+ files
       const shouldEscalate = parsed.needsMoreContext
@@ -156,66 +229,146 @@ export async function generateCommitPlan(options: GenerateOptions): Promise<Comm
         });
         onProgress?.(`${reason} - fetching diff...`);
 
-        // Get diff for requested files (or all files if none specified)
-        const filesToDiff = parsed.requestedFiles.length > 0
-          ? parsed.requestedFiles.filter((f) => summaries.some((s) => s.path === f))
-          : summaries.map((s) => s.path);
+        // Get diff for requested files with smart selection
+        // 1. If LLM specified files, use them (max 15)
+        // 2. If empty/none specified, auto-select top 15 most changed files
+        let filesToDiff: string[];
+
+        if (parsed.requestedFiles.length > 0) {
+          // LLM requested specific files - validate they exist and limit to 15
+          const validFiles = parsed.requestedFiles.filter((f) => summaries.some((s) => s.path === f));
+          filesToDiff = validFiles.slice(0, 15); // Truncate to max 15
+
+          if (validFiles.length > 15) {
+            await logger.warn(`LLM requested ${validFiles.length} files, truncated to 15 most critical`, {
+              requestedCount: validFiles.length,
+              truncatedCount: 15,
+            });
+          }
+        } else {
+          // No files specified - auto-select top 15 by change size
+          const sortedByChanges = [...summaries].sort((a, b) => {
+            const aChanges = (a.additions ?? 0) + (a.deletions ?? 0);
+            const bChanges = (b.additions ?? 0) + (b.deletions ?? 0);
+            return bChanges - aChanges; // Descending order
+          });
+
+          filesToDiff = sortedByChanges.slice(0, 15).map((s) => s.path);
+
+          await logger.debug('Auto-selected top 15 most changed files for Phase 2', {
+            totalFiles: summaries.length,
+            selectedCount: filesToDiff.length,
+          });
+        }
 
         const diffs = await getFileDiffs(cwd, filesToDiff);
 
-        // 🔒 Security: Check for secrets in diffs before sending to LLM
-        const secretDiffs = detectSecretsInDiffs(diffs);
-        const secretFilesInDiff = Array.from(secretDiffs.keys());
+        // 🔒 Security: Check for secrets in diffs with EXACT LOCATION
+        const secretMatches = detectSecretsWithLocation(diffs);
 
-        if (secretFilesInDiff.length > 0) {
-          // Found secrets in diff content - ABORT COMPLETELY
-          const warning = formatSecretsWarning(secretFilesInDiff);
-          await logger.error('🚨 SECRETS DETECTED IN DIFF CONTENT - ABORTING', new Error('Secrets in diff'), {
-            secretFiles: secretFilesInDiff,
+        if (secretMatches.length > 0) {
+          // Found secrets in diff content with exact locations
+          const report = formatSecretsReport(secretMatches);
+          await logger.error('🚨 SECRETS DETECTED IN DIFF CONTENT', new Error('Secrets in diff'), {
+            secretMatches,
           });
-          onProgress?.('🚨 Secrets detected - ABORTING');
+          onProgress?.('🚨 Secrets detected in diff');
 
-          // Show error to user
-          console.error('\n' + warning + '\n');
+          // Show detailed report to user
+          console.error('\n' + report + '\n');
 
-          // ABORT - do not proceed
-          throw new Error(`Secrets detected in ${secretFilesInDiff.length} file(s) diff content. Cannot proceed with commit generation. Remove secrets before committing.`);
+          // Check if --allow-secrets flag is set
+          if (!options.allowSecrets) {
+            // No bypass flag - ABORT immediately
+            throw new SecretsDetectedError(
+              secretMatches,
+              `Secrets detected in ${secretMatches.length} location(s). Use --allow-secrets to bypass after review, or remove secrets before committing.`
+            );
+          }
+
+          // --allow-secrets flag is set - ask for user confirmation (or auto-confirm with --yes)
+          console.log('\n⚠️  WARNING: --allow-secrets flag detected\n');
+          const confirmed = await promptUserConfirmation(
+            `⚠️  Proceed with committing changes that contain ${secretMatches.length} potential secret(s)?`,
+            false, // default: NO
+            options.autoConfirm // auto-confirm if --yes flag
+          );
+
+          if (!confirmed) {
+            // User declined - ABORT
+            throw new SecretsDetectedError(
+              secretMatches,
+              'User declined to commit changes with potential secrets.'
+            );
+          }
+
+          // User confirmed - log warning and continue
+          await logger.warn('User confirmed to proceed with diff containing potential secrets', {
+            secretMatches: secretMatches.map(m => ({ file: m.file, line: m.line, pattern: m.patternName })),
+            confirmedAt: new Date().toISOString(),
+          });
+          console.log('✅ User confirmed - continuing with Phase 2 analysis...\n');
+          onProgress?.('Re-analyzing with diff context (Phase 2)...');
         }
 
         if (diffs.size > 0) {
-          // Phase 2: Re-generate with diff context (with retry)
+          // Phase 2: Re-generate with diff context
           // Scale maxTokens with file count: more files = more commits = more tokens needed
           const maxTokensPhase2 = Math.min(6000, 3000 + Math.floor(summaries.length / 20) * 500);
-          const promptWithDiff = buildPromptWithDiff(summaries, diffs, recentCommits);
 
           await logger.debug('Re-analyzing with diff context (Phase 2)', {
             filesWithDiff: filesToDiff.length,
-            promptPreview: promptWithDiff.substring(0, 500),
+            supportsNativeTools,
           });
           onProgress?.('Re-analyzing with diff context (Phase 2)...');
-          const resultWithDiff = await retryLLMCall(
-            () => llm.complete(promptWithDiff, {
-              systemPrompt: SYSTEM_PROMPT_WITH_DIFF,
-              temperature: 0.3,
-              maxTokens: maxTokensPhase2,
-            }),
-            'Phase 2',
-            logger,
-            onProgress
-          );
 
-          parsed = parseResponse(resultWithDiff.content, summaries, patternAnalysis);
-          tokensUsed = (tokensUsed ?? 0) + (resultWithDiff.tokensUsed ?? 0);
-          escalated = true;
+          if (supportsNativeTools) {
+            // Phase 2 with native tools
+            const resultWithDiff = await generateWithNativeToolsPhase2(
+              llm,
+              summaries,
+              diffs,
+              recentCommits,
+              logger,
+              onProgress
+            );
+
+            parsed = resultWithDiff.parsed;
+            tokensUsed = (tokensUsed ?? 0) + (resultWithDiff.tokensUsed ?? 0);
+            escalated = true;
+          } else {
+            // Phase 2 with text-based parsing (fallback)
+            const promptWithDiff = buildPromptWithDiff(summaries, diffs, recentCommits);
+
+            const resultWithDiff = await retryLLMCall(
+              () => llm.complete(promptWithDiff, {
+                systemPrompt: SYSTEM_PROMPT_WITH_DIFF,
+                temperature: 0.3,
+                maxTokens: maxTokensPhase2,
+              }),
+              'Phase 2',
+              logger,
+              onProgress
+            );
+
+            parsed = parseResponse(resultWithDiff.content, summaries, patternAnalysis);
+            tokensUsed = (tokensUsed ?? 0) + (resultWithDiff.tokensUsed ?? 0);
+            escalated = true;
+          }
         }
       }
 
       commits = parsed.commits;
 
-      // Validate that all files from summaries are included
-      commits = validateAndFixCommits(commits, summaries);
+      // Validate that all files from summaries are included (may invoke Phase 3)
+      commits = await validateAndFixCommits(commits, summaries, llm, llmUsed, logger, onProgress);
     } catch (error) {
-      // Fallback to heuristics on LLM error after all retries failed
+      // CRITICAL: Re-throw SecretsDetectedError immediately - DO NOT fallback to heuristics!
+      if (error instanceof SecretsDetectedError) {
+        throw error;
+      }
+
+      // Fallback to heuristics ONLY for LLM errors (parse, timeout, etc.)
       await logger.warn('LLM generation failed after retries, falling back to heuristics', {
         error: error instanceof Error ? error.message : String(error),
       });
@@ -296,7 +449,7 @@ function filterFilesByScope(files: string[], resolvedScope: ResolvedScope): stri
  * Filter git status by resolved scope
  */
 function filterGitStatusByScope(status: GitStatus, resolvedScope?: ResolvedScope): GitStatus {
-  if (!resolvedScope) return status;
+  if (!resolvedScope) {return status;}
 
   const filterFn = (files: string[]) => filterFilesByScope(files, resolvedScope);
 
@@ -304,6 +457,375 @@ function filterGitStatusByScope(status: GitStatus, resolvedScope?: ResolvedScope
     staged: filterFn(status.staged),
     unstaged: filterFn(status.unstaged),
     untracked: filterFn(status.untracked),
+  };
+}
+
+/**
+ * Generate commits using native tools (chatWithTools) - Phase 1
+ * Returns structured output without JSON parsing errors
+ */
+async function generateWithNativeTools(
+  llm: ReturnType<typeof useLLM>,
+  summaries: FileSummary[],
+  patternAnalysis: PatternAnalysis,
+  recentCommits: string[],
+  logger: ReturnType<typeof useLogger>,
+  _onProgress?: (message: string) => void
+): Promise<{ parsed: ParsedLLMResponse; tokensUsed?: number }> {
+  if (!llm || !llm.chatWithTools) {
+    throw new Error('LLM does not support native tools (chatWithTools)');
+  }
+
+  // Build user prompt (without JSON format instructions)
+  const userPrompt = buildEnhancedPrompt(summaries, patternAnalysis, recentCommits);
+
+  // Build messages
+  // Note: SYSTEM_PROMPT contains JSON format instructions which are automatically
+  // ignored by OpenAI when using native tools (tool schema takes precedence)
+  const messages: LLMMessage[] = [
+    {
+      role: 'system',
+      content: SYSTEM_PROMPT,
+    },
+    {
+      role: 'user',
+      content: userPrompt,
+    },
+  ];
+
+  // Call LLM with native tools
+  const response = await llm.chatWithTools(messages, {
+    tools: [COMMIT_PLAN_TOOL],
+    toolChoice: {
+      type: 'function',
+      function: { name: 'generate_commit_plan' },
+    },
+    temperature: 0.3,
+  });
+
+  // Extract tool call
+  const toolCall = response.toolCalls?.[0];
+  if (!toolCall || toolCall.name !== 'generate_commit_plan') {
+    throw new Error('LLM did not call generate_commit_plan tool');
+  }
+
+  // Tool call input is already parsed JSON (no JSON.parse needed!)
+  const toolArgs = toolCall.input as {
+    needsMoreContext?: boolean;
+    requestedFiles?: string[];
+    commits: CommitGroup[];
+  };
+
+  // Calculate average confidence from commits
+  const totalConfidence = toolArgs.commits.reduce((sum, c) => {
+    const confidence = c.reasoning?.confidence ?? 0.5;
+    return sum + confidence;
+  }, 0);
+  const averageConfidence = toolArgs.commits.length > 0
+    ? totalConfidence / toolArgs.commits.length
+    : 0;
+
+  await logger.debug('Native tools Phase 1 result', {
+    needsMoreContext: toolArgs.needsMoreContext,
+    requestedFiles: toolArgs.requestedFiles?.length ?? 0,
+    commitsCount: toolArgs.commits.length,
+    averageConfidence,
+  });
+
+  return {
+    parsed: {
+      needsMoreContext: Boolean(toolArgs.needsMoreContext),
+      requestedFiles: toolArgs.requestedFiles ?? [],
+      commits: toolArgs.commits,
+      averageConfidence,
+    },
+    tokensUsed: response.usage ? (response.usage.promptTokens + response.usage.completionTokens) : undefined,
+  };
+}
+
+/**
+ * Generate commits for missing files using native tools (Phase 3)
+ * Called when LLM forgot to include some files in Phase 1/2
+ * May return multiple commits if files should be grouped differently
+ */
+async function generateMissingFilesCommit(
+  llm: ReturnType<typeof useLLM>,
+  missingSummaries: FileSummary[],
+  existingCommits: CommitGroup[],
+  logger: ReturnType<typeof useLogger>,
+  onProgress?: (message: string) => void
+): Promise<CommitGroup[] | null> {
+  if (!llm || !llm.chatWithTools) {
+    return null; // Fallback to generic commit if no LLM
+  }
+
+  // Build context: what commits were already created (with IDs and files for extend_existing action)
+  const existingCommitsContext = existingCommits
+    .map((c) => {
+      const filesPreview = c.files.length <= 3
+        ? c.files.join(', ')
+        : `${c.files.slice(0, 3).join(', ')} and ${c.files.length - 3} more`;
+      return `[${c.id}] ${c.type}${c.scope ? `(${c.scope})` : ''}: ${c.message}\n   Files: ${filesPreview}`;
+    })
+    .join('\n\n');
+
+  // Build prompt for missing files
+  const missingFilesList = missingSummaries
+    .map((s) => {
+      const stats = s.binary ? 'binary' : `+${s.additions}/-${s.deletions}`;
+      const isNew = s.isNewFile ? 'IsNewFile: true' : 'IsNewFile: false';
+      return `- ${s.path} (${s.status}, ${stats}, ${isNew})`;
+    })
+    .join('\n');
+
+  const systemPrompt = `You are analyzing files that were not included in the initial commit plan.
+
+CONTEXT: These files were not classified by the LLM in previous phases. Your task is to determine:
+1. Why they were missed (config files, minor changes, unrelated changes, etc.)
+2. Whether they belong to an EXISTING commit or need a NEW commit
+3. What type of commit they should be (chore, refactor, fix, feat, docs, test, etc.)
+
+CRITICAL: You have TWO actions available:
+
+ACTION 1: extend_existing (PREFER THIS if file is related to existing commit)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Use when a file logically belongs to an already created commit.
+
+Example: If existing commit is "feat(fs): add fs adapter" and you see:
+- packages/adapters-fs/src/secure-storage.test.ts (test for fs adapter)
+
+Then use:
+{
+  "action": "extend_existing",
+  "existingCommitId": "c1",
+  "files": ["packages/adapters-fs/src/secure-storage.test.ts"]
+}
+
+The file will be added to commit c1 instead of creating a new commit.
+
+ACTION 2: create_new (use when file is unrelated to existing commits)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Use when files don't fit into any existing commit.
+
+DEFAULT to "chore" unless you see clear evidence of feat/fix/refactor.
+
+IMPORTANT: These are leftover files - they are usually:
+- Configuration files (package.json, tsconfig.json, etc.)
+- Minor updates to existing files
+- Test files or documentation
+- Build/tooling changes
+
+CRITICAL: WRITE INFORMATIVE COMMIT MESSAGES (not generic):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+❌ BAD (too generic):
+- "update files"
+- "update configuration"
+- "update additional files"
+- "update 30 files"
+
+✅ GOOD (specific and descriptive):
+- "update TypeScript and ESLint configuration for strict mode"
+- "update package dependencies for security patches"
+- "update build configuration to support ESM modules"
+
+Guidelines:
+- Include WHAT was changed (specific files/components)
+- Include WHY if relevant (context about the change)
+- Use concrete nouns (not "files", "additional files")
+- Add context that helps reviewers understand the change`;
+
+  const userPrompt = `Existing commits (you can add files to these using extend_existing action):
+${existingCommitsContext}
+
+Files that need classification (${missingSummaries.length} remaining):
+${missingFilesList}
+
+IMPORTANT: You don't need to classify ALL files in one response if there are too many.
+- If you can confidently classify some files → do it
+- If you're unsure about some files → skip them (they'll be processed in next iteration)
+- Focus on files you can group logically
+
+For each file, choose the appropriate action:
+1. extend_existing - if file belongs to an existing commit (e.g., test file for fs adapter → add to "feat(fs): add fs adapter")
+2. create_new - if file doesn't fit into any existing commit
+
+You may create:
+- ONE new commit if all remaining files are related (same purpose, same change type)
+- MULTIPLE new commits if files have different purposes (e.g., separate config changes from test updates)
+- MIX of extend_existing and create_new actions (recommended!)
+
+CRITICAL: Be specific in each commit message - describe WHAT is being changed, not just "update files".
+PREFER extend_existing when possible to avoid creating unnecessary commits.`;
+
+  const messages: LLMMessage[] = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userPrompt },
+  ];
+
+  try {
+    onProgress?.('Classifying remaining files (Phase 3)...');
+
+    const response = await llm.chatWithTools(messages, {
+      tools: [COMMIT_PLAN_TOOL_PHASE3],
+      toolChoice: {
+        type: 'function',
+        function: { name: 'generate_commit_plan' },
+      },
+      temperature: 0.3,
+    });
+
+    const toolCall = response.toolCalls?.[0];
+    if (!toolCall || toolCall.name !== 'generate_commit_plan') {
+      await logger.warn('Phase 3: LLM did not call tool, using fallback');
+      return null;
+    }
+
+    const toolArgs = toolCall.input as {
+      commits: Array<CommitGroup & { action?: 'create_new' | 'extend_existing'; existingCommitId?: string }>;
+    };
+
+    if (!toolArgs.commits || toolArgs.commits.length === 0) {
+      await logger.warn('Phase 3: LLM returned empty commits, using fallback');
+      return null;
+    }
+
+    // Process each commit action
+    const newCommits: CommitGroup[] = [];
+    let extendedCount = 0;
+    let createdCount = 0;
+
+    for (const commit of toolArgs.commits) {
+      const action = commit.action || 'create_new'; // Default to create_new for backward compatibility
+
+      if (action === 'extend_existing') {
+        // Find existing commit by ID
+        const existingCommit = existingCommits.find(c => c.id === commit.existingCommitId);
+        if (existingCommit) {
+          // Add files to existing commit
+          existingCommit.files.push(...commit.files);
+          extendedCount++;
+          await logger.debug('Phase 3: Extended existing commit', {
+            commitId: existingCommit.id,
+            message: existingCommit.message,
+            addedFiles: commit.files.length,
+          });
+        } else {
+          // Fallback: create new commit if ID not found
+          await logger.warn('Phase 3: Commit ID not found, creating new instead', {
+            requestedId: commit.existingCommitId,
+          });
+          newCommits.push({
+            ...commit,
+            id: `c${existingCommits.length + newCommits.length + 1}`,
+            action: undefined, // Remove action field from final commit
+            existingCommitId: undefined,
+          } as CommitGroup);
+          createdCount++;
+        }
+      } else {
+        // action === 'create_new'
+        newCommits.push({
+          ...commit,
+          id: `c${existingCommits.length + newCommits.length + 1}`,
+          action: undefined, // Remove action field from final commit
+          existingCommitId: undefined,
+        } as CommitGroup);
+        createdCount++;
+      }
+    }
+
+    await logger.debug('Phase 3: Processed commits', {
+      total: toolArgs.commits.length,
+      extended: extendedCount,
+      created: createdCount,
+      newCommitsCount: newCommits.length,
+    });
+
+    return newCommits;
+  } catch (error) {
+    await logger.warn('Phase 3 failed, using fallback', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
+/**
+ * Generate commits using native tools (chatWithTools) - Phase 2 with diff
+ * Returns structured output without JSON parsing errors
+ */
+async function generateWithNativeToolsPhase2(
+  llm: ReturnType<typeof useLLM>,
+  summaries: FileSummary[],
+  diffs: Map<string, string>,
+  recentCommits: string[],
+  logger: ReturnType<typeof useLogger>,
+  _onProgress?: (message: string) => void
+): Promise<{ parsed: ParsedLLMResponse; tokensUsed?: number }> {
+  if (!llm || !llm.chatWithTools) {
+    throw new Error('LLM does not support native tools (chatWithTools)');
+  }
+
+  // Build user prompt with diff context
+  const userPrompt = buildPromptWithDiff(summaries, diffs, recentCommits);
+
+  // Build messages
+  const messages: LLMMessage[] = [
+    {
+      role: 'system',
+      content: SYSTEM_PROMPT_WITH_DIFF,
+    },
+    {
+      role: 'user',
+      content: userPrompt,
+    },
+  ];
+
+  // Call LLM with native tools
+  const response = await llm.chatWithTools(messages, {
+    tools: [COMMIT_PLAN_TOOL],
+    toolChoice: {
+      type: 'function',
+      function: { name: 'generate_commit_plan' },
+    },
+    temperature: 0.3,
+  });
+
+  // Extract tool call
+  const toolCall = response.toolCalls?.[0];
+  if (!toolCall || toolCall.name !== 'generate_commit_plan') {
+    throw new Error('LLM did not call generate_commit_plan tool in Phase 2');
+  }
+
+  // Tool call input is already parsed JSON (no JSON.parse needed!)
+  const toolArgs = toolCall.input as {
+    needsMoreContext?: boolean;
+    requestedFiles?: string[];
+    commits: CommitGroup[];
+  };
+
+  // Calculate average confidence from commits
+  const totalConfidence = toolArgs.commits.reduce((sum, c) => {
+    const confidence = c.reasoning?.confidence ?? 0.5;
+    return sum + confidence;
+  }, 0);
+  const averageConfidence = toolArgs.commits.length > 0
+    ? totalConfidence / toolArgs.commits.length
+    : 0;
+
+  await logger.debug('Native tools Phase 2 result', {
+    commitsCount: toolArgs.commits.length,
+    averageConfidence,
+  });
+
+  return {
+    parsed: {
+      needsMoreContext: false, // Phase 2 is final, no more escalation
+      requestedFiles: [],
+      commits: toolArgs.commits,
+      averageConfidence,
+    },
+    tokensUsed: response.usage ? (response.usage.promptTokens + response.usage.completionTokens) : undefined,
   };
 }
 
@@ -317,13 +839,18 @@ export interface ValidationResult {
  * Anti-hallucination validation: ensure LLM output matches reality
  * 1. Remove hallucinated files (files that don't exist in git status)
  * 2. Remove duplicate files (file appears in multiple commits)
- * 3. Add missing files that LLM forgot
+ * 3. Add missing files that LLM forgot (Phase 3: use LLM if available)
  * 4. Track warnings for debugging
  */
-function validateAndFixCommits(
+// eslint-disable-next-line sonarjs/cognitive-complexity -- Anti-hallucination checks: detects hallucinated files, removes duplicates, groups forgotten files, optional LLM phase 3, tracks warnings
+async function validateAndFixCommits(
   commits: CommitGroup[],
-  summaries: FileSummary[]
-): CommitGroup[] {
+  summaries: FileSummary[],
+  llm: ReturnType<typeof useLLM>,
+  llmUsed: boolean,
+  logger: ReturnType<typeof useLogger>,
+  onProgress?: (message: string) => void
+): Promise<CommitGroup[]> {
   const realFiles = new Set(summaries.map((s) => s.path));
   const hallucinations: string[] = [];
 
@@ -344,7 +871,6 @@ function validateAndFixCommits(
   let nonEmptyCommits = commits.filter((c) => c.files.length > 0);
 
   // Step 3: Remove duplicate files - keep only first occurrence
-  const logger = useLogger();
   const seenFiles = new Set<string>();
   const duplicates: Array<{ file: string; commit: string }> = [];
 
@@ -372,21 +898,124 @@ function validateAndFixCommits(
   // Step 4: Remove commits that became empty after deduplication
   nonEmptyCommits = nonEmptyCommits.filter((c) => c.files.length > 0);
 
-  // Step 5: Find missing files and add them
-  const allFilesInCommits = new Set(nonEmptyCommits.flatMap((c) => c.files));
-  const missingFiles = summaries
-    .map((s) => s.path)
-    .filter((f) => !allFilesInCommits.has(f));
+  // Step 5: Adaptive Phase 3 loop - process missing files iteratively (up to 5 iterations for heavy cases)
+  const MAX_PHASE3_ITERATIONS = 5;
+  let phase3Iteration = 0;
 
-  if (missingFiles.length > 0) {
-    nonEmptyCommits.push({
+  while (phase3Iteration < MAX_PHASE3_ITERATIONS) {
+    // Recalculate missing files after each iteration
+    const allFilesInCommits = new Set(nonEmptyCommits.flatMap((c) => c.files));
+    const missingFiles = summaries
+      .map((s) => s.path)
+      .filter((f) => !allFilesInCommits.has(f));
+
+    if (missingFiles.length === 0) {
+      // ✅ Success! All files classified
+      if (phase3Iteration > 0) {
+        await logger.info('Phase 3: All files classified', {
+          totalIterations: phase3Iteration,
+          totalCommits: nonEmptyCommits.length,
+        });
+      }
+      break;
+    }
+
+    phase3Iteration++;
+
+    await logger.debug(`Phase 3 iteration ${phase3Iteration}/${MAX_PHASE3_ITERATIONS}`, {
+      missingFiles: missingFiles.length,
+      processedSoFar: summaries.length - missingFiles.length,
+      totalFiles: summaries.length,
+      progress: `${Math.round(((summaries.length - missingFiles.length) / summaries.length) * 100)}%`,
+    });
+
+    // Update progress for user
+    if (onProgress) {
+      const progress = Math.round(((summaries.length - missingFiles.length) / summaries.length) * 100);
+      onProgress(`Classifying remaining files (Phase 3, iteration ${phase3Iteration}, ${progress}%)...`);
+    }
+
+    // Get summaries for missing files only
+    const missingSummaries = summaries.filter((s) => missingFiles.includes(s.path));
+
+    // Try LLM to generate commits for missing files (may extend existing or create new)
+    let missingCommits: CommitGroup[] | null = null;
+
+    if (llmUsed && llm) {
+      missingCommits = await generateMissingFilesCommit(
+        llm,
+        missingSummaries,
+        nonEmptyCommits,  // ← pass updated commits list (includes previous iterations)
+        logger,
+        onProgress
+      );
+
+      if (missingCommits && missingCommits.length > 0) {
+        await logger.debug(`Phase 3 iteration ${phase3Iteration}: Processed commits`, {
+          commitCount: missingCommits.length,
+          filesCount: missingCommits.reduce((sum, c) => sum + c.files.length, 0),
+        });
+
+        // Add new commits to the list (extended commits are already modified in place)
+        nonEmptyCommits.push(...missingCommits);
+      }
+    }
+
+    // Safety check: if LLM didn't process ANY files, break to avoid infinite loop
+    const newMissingFiles = summaries
+      .map((s) => s.path)
+      .filter((f) => !new Set(nonEmptyCommits.flatMap(c => c.files)).has(f));
+
+    if (newMissingFiles.length === missingFiles.length) {
+      // LLM didn't process any files this iteration - something is wrong
+      await logger.warn('Phase 3: LLM made no progress, stopping iterations', {
+        iteration: phase3Iteration,
+        stillMissing: newMissingFiles.length,
+      });
+      break;
+    }
+
+    // Safety: if only few files left and many iterations, use fallback to avoid over-iteration
+    if (newMissingFiles.length <= 3 && phase3Iteration >= 2) {
+      await logger.debug('Phase 3: Few files left, proceeding to fallback');
+      break;
+    }
+  }
+
+  // Fallback: if still missing files after MAX_ITERATIONS
+  const finalMissingFiles = summaries
+    .map((s) => s.path)
+    .filter((f) => !new Set(nonEmptyCommits.flatMap(c => c.files)).has(f));
+
+  if (finalMissingFiles.length > 0) {
+    await logger.warn('Phase 3: Max iterations reached or LLM struggled, using fallback', {
+      totalIterations: phase3Iteration,
+      remainingFiles: finalMissingFiles.length,
+    });
+
+    const firstFile = finalMissingFiles[0];
+    const fileName = firstFile ? firstFile.split('/').pop() ?? firstFile : 'files';
+    const commitMessage = finalMissingFiles.length === 1
+      ? `update ${fileName}`
+      : `update ${finalMissingFiles.length} remaining files`;
+
+    const fallbackCommit: CommitGroup = {
       id: `c${nonEmptyCommits.length + 1}`,
       type: 'chore',
-      message: 'update additional files',
-      files: missingFiles,
+      message: commitMessage,
+      files: finalMissingFiles,
       releaseHint: 'none',
       breaking: false,
-    });
+      reasoning: {
+        newBehavior: false,
+        fixesBug: false,
+        internalOnly: true,
+        explanation: `Files not classified after ${phase3Iteration} Phase 3 iteration(s): ${finalMissingFiles.slice(0, 3).join(', ')}${finalMissingFiles.length > 3 ? ` and ${finalMissingFiles.length - 3} more` : ''}`,
+        confidence: 0.3,
+      },
+    };
+
+    nonEmptyCommits.push(fallbackCommit);
   }
 
   return nonEmptyCommits;
@@ -442,7 +1071,9 @@ async function retryLLMCall(
         onProgress?.(`${phase} ${errorType}, retrying (${attempt}/${MAX_LLM_RETRIES})...`);
 
         // Short delay before retry (exponential backoff: 1s, 2s, 4s...)
-        await new Promise((resolve) => setTimeout(resolve, 1000 * Math.pow(2, attempt - 1)));
+        await new Promise((resolve) => {
+          setTimeout(resolve, 1000 * Math.pow(2, attempt - 1));
+        });
       } else {
         await logger.error(`${phase} failed after ${MAX_LLM_RETRIES} attempts: ${errorType}`, lastError, {
           errorType,

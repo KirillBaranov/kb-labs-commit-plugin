@@ -1,11 +1,11 @@
-import { z } from 'zod';
+import { z } from "zod";
 import {
   CommitPlanSchema,
   GitStatusSchema,
   FileSummarySchema,
   ApplyResultSchema,
   PushResultSchema,
-} from '../schema';
+} from "../schema";
 
 // ============================================================================
 // Scopes
@@ -43,7 +43,7 @@ export type ScopesResponse = z.infer<typeof ScopesResponseSchema>;
  * - applied: Plan applied as commits, ready to push
  * - pushed: Commits pushed to remote
  */
-export const PlanStatusSchema = z.enum(['idle', 'ready', 'applied', 'pushed']);
+export const PlanStatusSchema = z.enum(["idle", "ready", "applied", "pushed"]);
 
 export type PlanStatus = z.infer<typeof PlanStatusSchema>;
 
@@ -51,9 +51,9 @@ export type PlanStatus = z.infer<typeof PlanStatusSchema>;
  * GET /status?scope=X response
  */
 export const StatusResponseSchema = z.object({
-  scope: z.string().default('root'),
+  scope: z.string().default("root"),
   hasPlan: z.boolean(),
-  planStatus: PlanStatusSchema.default('idle'),
+  planStatus: PlanStatusSchema.default("idle"),
   planTimestamp: z.string().datetime().optional(),
   gitStatus: GitStatusSchema.optional(),
   filesChanged: z.number().int().min(0).default(0),
@@ -71,19 +71,42 @@ export type StatusResponse = z.infer<typeof StatusResponseSchema>;
  * POST /generate request body
  */
 export const GenerateRequestSchema = z.object({
-  scope: z.string().default('root'),
+  scope: z.string().default("root"),
   dryRun: z.boolean().default(false),
+  allowSecrets: z.boolean().default(false),
+  autoConfirm: z.boolean().default(false),
 });
 
 export type GenerateRequest = z.infer<typeof GenerateRequestSchema>;
 
 /**
+ * Secret match location
+ */
+export const SecretMatchSchema = z.object({
+  file: z.string(),
+  line: z.number(),
+  column: z.number(),
+  type: z.string(),
+  pattern: z.string(),
+  matched: z.string(),
+  context: z.string(),
+});
+
+export type SecretMatch = z.infer<typeof SecretMatchSchema>;
+
+/**
  * POST /generate response
  */
 export const GenerateResponseSchema = z.object({
-  plan: CommitPlanSchema,
-  planPath: z.string(),
-  scope: z.string().default('root'),
+  success: z.boolean(),
+  // Success fields (when success=true)
+  plan: CommitPlanSchema.optional(),
+  planPath: z.string().optional(),
+  scope: z.string().default("root"),
+  // Secrets detected fields (when success=false)
+  secretsDetected: z.boolean().default(false),
+  secrets: z.array(SecretMatchSchema).optional(),
+  message: z.string().optional(),
 });
 
 export type GenerateResponse = z.infer<typeof GenerateResponseSchema>;
@@ -98,7 +121,7 @@ export type GenerateResponse = z.infer<typeof GenerateResponseSchema>;
 export const PlanResponseSchema = z.object({
   hasPlan: z.boolean(),
   plan: CommitPlanSchema.optional(),
-  scope: z.string().default('root'),
+  scope: z.string().default("root"),
 });
 
 export type PlanResponse = z.infer<typeof PlanResponseSchema>;
@@ -111,7 +134,7 @@ export type PlanResponse = z.infer<typeof PlanResponseSchema>;
  * POST /apply request body
  */
 export const ApplyRequestSchema = z.object({
-  scope: z.string().default('root'),
+  scope: z.string().default("root"),
   force: z.boolean().default(false),
 });
 
@@ -122,7 +145,7 @@ export type ApplyRequest = z.infer<typeof ApplyRequestSchema>;
  */
 export const ApplyResponseSchema = z.object({
   result: ApplyResultSchema,
-  scope: z.string().default('root'),
+  scope: z.string().default("root"),
 });
 
 export type ApplyResponse = z.infer<typeof ApplyResponseSchema>;
@@ -135,8 +158,8 @@ export type ApplyResponse = z.infer<typeof ApplyResponseSchema>;
  * POST /push request body
  */
 export const PushRequestSchema = z.object({
-  scope: z.string().default('root'),
-  remote: z.string().default('origin'),
+  scope: z.string().default("root"),
+  remote: z.string().default("origin"),
   force: z.boolean().default(false),
 });
 
@@ -147,7 +170,7 @@ export type PushRequest = z.infer<typeof PushRequestSchema>;
  */
 export const PushResponseSchema = z.object({
   result: PushResultSchema,
-  scope: z.string().default('root'),
+  scope: z.string().default("root"),
 });
 
 export type PushResponse = z.infer<typeof PushResponseSchema>;
@@ -162,7 +185,7 @@ export type PushResponse = z.infer<typeof PushResponseSchema>;
 export const ResetResponseSchema = z.object({
   success: z.boolean(),
   message: z.string(),
-  scope: z.string().default('root'),
+  scope: z.string().default("root"),
 });
 
 export type ResetResponse = z.infer<typeof ResetResponseSchema>;
@@ -175,7 +198,7 @@ export type ResetResponse = z.infer<typeof ResetResponseSchema>;
  * GET /git-status?scope=X response
  */
 export const GitStatusResponseSchema = z.object({
-  scope: z.string().default('root'),
+  scope: z.string().default("root"),
   status: GitStatusSchema,
   summaries: z.array(FileSummarySchema),
   totalFiles: z.number().int().min(0),
@@ -191,7 +214,7 @@ export type GitStatusResponse = z.infer<typeof GitStatusResponseSchema>;
  * GET /diff?scope=X&file=Y response
  */
 export const FileDiffResponseSchema = z.object({
-  scope: z.string().default('root'),
+  scope: z.string().default("root"),
   file: z.string(),
   diff: z.string(),
   additions: z.number().int().min(0).default(0),
@@ -208,7 +231,7 @@ export type FileDiffResponse = z.infer<typeof FileDiffResponseSchema>;
  * POST /summarize request body
  */
 export const SummarizeRequestSchema = z.object({
-  scope: z.string().default('root'),
+  scope: z.string().default("root"),
   /** Optional file path - if provided, summarize only this file */
   file: z.string().optional(),
 });
@@ -219,7 +242,7 @@ export type SummarizeRequest = z.infer<typeof SummarizeRequestSchema>;
  * POST /summarize response
  */
 export const SummarizeResponseSchema = z.object({
-  scope: z.string().default('root'),
+  scope: z.string().default("root"),
   file: z.string().optional(),
   summary: z.string(),
   /** Token usage for the LLM call */

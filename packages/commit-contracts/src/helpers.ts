@@ -7,7 +7,7 @@ import {
   pluginContractsManifest,
   type PluginArtifactIds,
   type PluginCommandIds,
-} from './contract';
+} from "./contract";
 
 /**
  * Get artifact path pattern by ID (type-safe)
@@ -60,7 +60,7 @@ export function hasArtifact(id: string): id is PluginArtifactIds {
  */
 export function getCommand<T extends PluginCommandIds>(id: T) {
   if (!pluginContractsManifest.commands) {
-    throw new Error('Commands not defined in contracts');
+    throw new Error("Commands not defined in contracts");
   }
   const command = pluginContractsManifest.commands[id];
   if (!command) {
@@ -78,7 +78,10 @@ export function getCommand<T extends PluginCommandIds>(id: T) {
  * }
  */
 export function hasCommand(id: string): id is PluginCommandIds {
-  return pluginContractsManifest.commands !== undefined && id in pluginContractsManifest.commands;
+  return (
+    pluginContractsManifest.commands !== undefined &&
+    id in pluginContractsManifest.commands
+  );
 }
 
 /**

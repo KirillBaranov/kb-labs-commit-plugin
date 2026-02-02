@@ -68,7 +68,7 @@ export function filterByTags(
   tags: string[]
 ): BenchmarkTestCase[] {
   return cases.filter((c) => {
-    if (!c.tags) return false;
+    if (!c.tags) {return false;}
     return tags.some((tag) => c.tags!.includes(tag));
   });
 }

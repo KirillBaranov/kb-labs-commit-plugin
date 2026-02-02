@@ -8,7 +8,7 @@
  * - Consistent DX across commands
  */
 
-import { defineFlags } from '@kb-labs/sdk';
+import { defineFlags } from "@kb-labs/sdk";
 
 /**
  * Flags for commit:commit (run) command
@@ -20,23 +20,34 @@ import { defineFlags } from '@kb-labs/sdk';
  */
 export const commitFlags = defineFlags({
   scope: {
-    type: 'string',
-    description: 'Limit commits to specific package or path pattern',
-    examples: ['@kb-labs/core', 'packages/**', 'kb-labs-mind/**'],
+    type: "string",
+    description: "Limit commits to specific package or path pattern",
+    examples: ["@kb-labs/core", "packages/**", "kb-labs-mind/**"],
   },
   json: {
-    type: 'boolean',
-    description: 'Output result as JSON instead of formatted text',
+    type: "boolean",
+    description: "Output result as JSON instead of formatted text",
     default: false,
   },
-  'dry-run': {
-    type: 'boolean',
-    description: 'Preview commits without applying them to git',
+  "dry-run": {
+    type: "boolean",
+    description: "Preview commits without applying them to git",
     default: false,
   },
-  'with-push': {
-    type: 'boolean',
-    description: 'Push commits to remote after applying',
+  "with-push": {
+    type: "boolean",
+    description: "Push commits to remote after applying",
+    default: false,
+  },
+  "allow-secrets": {
+    type: "boolean",
+    description:
+      "Allow committing files with detected secrets (requires manual confirmation). Use with caution after reviewing detected locations.",
+    default: false,
+  },
+  yes: {
+    type: "boolean",
+    description: "Automatically confirm all prompts (non-interactive mode)",
     default: false,
   },
 });
@@ -64,13 +75,24 @@ export type CommitFlags = typeof commitFlags.infer;
  */
 export const generateFlags = defineFlags({
   scope: {
-    type: 'string',
-    description: 'Limit analysis to specific package or path pattern',
-    examples: ['@kb-labs/core', 'packages/**', 'kb-labs-mind/**'],
+    type: "string",
+    description: "Limit analysis to specific package or path pattern",
+    examples: ["@kb-labs/core", "packages/**", "kb-labs-mind/**"],
   },
   json: {
-    type: 'boolean',
-    description: 'Output commit plan as JSON instead of formatted text',
+    type: "boolean",
+    description: "Output commit plan as JSON instead of formatted text",
+    default: false,
+  },
+  "allow-secrets": {
+    type: "boolean",
+    description:
+      "Allow generating commits for files with detected secrets (requires manual confirmation). Use with caution after reviewing detected locations.",
+    default: false,
+  },
+  yes: {
+    type: "boolean",
+    description: "Automatically confirm all prompts (non-interactive mode)",
     default: false,
   },
 });

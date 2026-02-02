@@ -29,9 +29,9 @@ export function resolveScopePath(baseCwd: string, scope: string = 'root'): strin
   if (parts.length === 2) {
     const [scopeName, pkgName] = parts;
     // If scope === package (e.g., @kb-labs/kb-labs), use just the scope name
-    if (scopeName === pkgName) {
+    if (scopeName === pkgName && scopeName) {
       normalized = scopeName;
-    } else {
+    } else if (scopeName && pkgName) {
       // Otherwise combine: kb-labs-mind
       normalized = `${scopeName}-${pkgName}`;
     }

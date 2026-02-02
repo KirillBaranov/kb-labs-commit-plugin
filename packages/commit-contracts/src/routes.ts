@@ -6,7 +6,7 @@
 /**
  * REST API base path for commit plugin
  */
-export const COMMIT_BASE_PATH = '/v1/plugins/commit' as const;
+export const COMMIT_BASE_PATH = "/v1/plugins/commit" as const;
 
 /**
  * REST API route paths (relative to basePath)
@@ -18,40 +18,40 @@ export const COMMIT_BASE_PATH = '/v1/plugins/commit' as const;
  */
 export const COMMIT_ROUTES = {
   /** GET /scopes - List available scopes */
-  SCOPES: '/scopes',
+  SCOPES: "/scopes",
 
   /** GET /status - Get current status (plan + git) */
-  STATUS: '/status',
+  STATUS: "/status",
 
   /** GET /plan - Get current commit plan */
-  PLAN: '/plan',
+  PLAN: "/plan",
 
   /** GET /git-status - Get git status with file details */
-  GIT_STATUS: '/git-status',
+  GIT_STATUS: "/git-status",
 
   /** GET /files - Get file tree with diff statistics */
-  FILES: '/files',
+  FILES: "/files",
 
   /** GET /diff - Get diff for a specific file */
-  DIFF: '/diff',
+  DIFF: "/diff",
 
   /** POST /summarize - Summarize changes using LLM */
-  SUMMARIZE: '/summarize',
+  SUMMARIZE: "/summarize",
 
   /** GET /actions - Get actions widget data */
-  ACTIONS: '/actions',
+  ACTIONS: "/actions",
 
   /** POST /generate - Generate new commit plan */
-  GENERATE: '/generate',
+  GENERATE: "/generate",
 
   /** POST /apply - Apply commit plan */
-  APPLY: '/apply',
+  APPLY: "/apply",
 
   /** POST /push - Push commits to remote */
-  PUSH: '/push',
+  PUSH: "/push",
 
   /** DELETE /plan - Delete current plan */
-  RESET: '/plan',
+  RESET: "/plan",
 } as const;
 
 /**
@@ -78,19 +78,20 @@ export const COMMIT_FULL_ROUTES = {
  * Use these in manifest.studio.widgets[].data.source.routeId
  */
 export const COMMIT_WIDGET_ROUTES = {
-  SCOPES: 'scopes',
-  STATUS: 'status',
-  PLAN: 'plan',
-  GIT_STATUS: 'git-status',
-  FILES: 'files',
-  DIFF: 'diff',
-  SUMMARIZE: 'summarize',
-  ACTIONS: 'actions',
-  GENERATE: 'generate',
-  APPLY: 'apply',
-  PUSH: 'push',
-  RESET: 'plan',
+  SCOPES: "scopes",
+  STATUS: "status",
+  PLAN: "plan",
+  GIT_STATUS: "git-status",
+  FILES: "files",
+  DIFF: "diff",
+  SUMMARIZE: "summarize",
+  ACTIONS: "actions",
+  GENERATE: "generate",
+  APPLY: "apply",
+  PUSH: "push",
+  RESET: "plan",
 } as const;
 
-export type CommitRoute = typeof COMMIT_ROUTES[keyof typeof COMMIT_ROUTES];
-export type CommitWidgetRoute = typeof COMMIT_WIDGET_ROUTES[keyof typeof COMMIT_WIDGET_ROUTES];
+export type CommitRoute = (typeof COMMIT_ROUTES)[keyof typeof COMMIT_ROUTES];
+export type CommitWidgetRoute =
+  (typeof COMMIT_WIDGET_ROUTES)[keyof typeof COMMIT_WIDGET_ROUTES];

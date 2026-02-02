@@ -1,8 +1,6 @@
 import { defineHandler, type PluginContextV3, type RestInput } from '@kb-labs/sdk';
 import {
   COMMIT_CACHE_PREFIX,
-  ApplyRequestSchema,
-  ApplyResponseSchema,
   type ApplyRequest,
   type ApplyResponse,
 } from '@kb-labs/commit-contracts';

@@ -6,15 +6,17 @@
  * 3. Path pattern: packages/core/src/**
  */
 
-import { readFile } from 'node:fs/promises';
-import { join, relative } from 'node:path';
-import globby from 'globby';
+/* eslint-disable no-await-in-loop -- Sequential file reads required for package.json discovery in nested directories */
+
+import { readFile } from "node:fs/promises";
+import { join, relative } from "node:path";
+import globby from "globby";
 
 export interface ResolvedScope {
   /** Original scope string */
   original: string;
   /** Type of scope */
-  type: 'package-name' | 'wildcard' | 'path-pattern';
+  type: "package-name" | "wildcard" | "path-pattern";
   /** Resolved package paths (directories) */
   packagePaths: string[];
   /** Pattern to filter files (glob or regex) */
@@ -29,11 +31,16 @@ export interface PackageInfo {
 /**
  * Resolve scope to package paths and file pattern
  */
-export async function resolveScope(cwd: string, scope: string): Promise<ResolvedScope> {
+export async function resolveScope(
+  cwd: string,
+  scope: string,
+): Promise<ResolvedScope> {
   // Detect scope type
-  const isExactPackageName = !scope.includes('*') && (scope.startsWith('@') || !scope.includes('/'));
-  const isWildcardPackageName = scope.includes('*') && (scope.startsWith('@') || !scope.includes('/'));
-  const isPathPattern = scope.includes('/') && !scope.startsWith('@');
+  const isExactPackageName =
+    !scope.includes("*") && (scope.startsWith("@") || !scope.includes("/"));
+  const isWildcardPackageName =
+    scope.includes("*") && (scope.startsWith("@") || !scope.includes("/"));
+  const _isPathPattern = scope.includes("/") && !scope.startsWith("@");
 
   if (isExactPackageName) {
     // Exact package name: @kb-labs/core
@@ -42,9 +49,10 @@ export async function resolveScope(cwd: string, scope: string): Promise<Resolved
 
     return {
       original: scope,
-      type: 'package-name',
+      type: "package-name",
       packagePaths: matched.map((p) => p.path),
-      filePattern: matched.length > 0 ? createGlobPattern(cwd, matched) : undefined,
+      filePattern:
+        matched.length > 0 ? createGlobPattern(cwd, matched) : undefined,
     };
   }
 
@@ -56,16 +64,17 @@ export async function resolveScope(cwd: string, scope: string): Promise<Resolved
 
     return {
       original: scope,
-      type: 'wildcard',
+      type: "wildcard",
       packagePaths: matched.map((p) => p.path),
-      filePattern: matched.length > 0 ? createGlobPattern(cwd, matched) : undefined,
+      filePattern:
+        matched.length > 0 ? createGlobPattern(cwd, matched) : undefined,
     };
   }
 
   // Path pattern: packages/core/** or src/**/*.ts
   return {
     original: scope,
-    type: 'path-pattern',
+    type: "path-pattern",
     packagePaths: [],
     filePattern: scope,
   };
@@ -74,14 +83,20 @@ export async function resolveScope(cwd: string, scope: string): Promise<Resolved
 /**
  * Check if a file matches the resolved scope
  */
-export function matchesScope(filePath: string, resolvedScope: ResolvedScope): boolean {
+export function matchesScope(
+  filePath: string,
+  resolvedScope: ResolvedScope,
+): boolean {
   // For package-based scopes, check if file is within any package path
   if (resolvedScope.packagePaths.length > 0) {
     return resolvedScope.packagePaths.some((pkgPath) => {
       // Normalize both paths for comparison
-      const normalizedFile = filePath.replace(/\\/g, '/');
-      const normalizedPkg = pkgPath.replace(/\\/g, '/');
-      return normalizedFile.startsWith(normalizedPkg + '/') || normalizedFile === normalizedPkg;
+      const normalizedFile = filePath.replace(/\\/g, "/");
+      const normalizedPkg = pkgPath.replace(/\\/g, "/");
+      return (
+        normalizedFile.startsWith(normalizedPkg + "/") ||
+        normalizedFile === normalizedPkg
+      );
     });
   }
 
@@ -96,23 +111,23 @@ async function discoverPackages(cwd: string): Promise<PackageInfo[]> {
   const packages: PackageInfo[] = [];
 
   // Find all package.json files
-  const packageJsonPaths = await globby('**/package.json', {
+  const packageJsonPaths = await globby("**/package.json", {
     cwd,
     absolute: true,
     onlyFiles: true,
     ignore: [
-      '**/node_modules/**',
-      '**/dist/**',
-      '**/build/**',
-      '**/.git/**',
-      '**/.*/**',
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/.git/**",
+      "**/.*/**",
     ],
   });
 
   for (const packageJsonPath of packageJsonPaths) {
     try {
-      const packagePath = join(packageJsonPath, '..');
-      const content = await readFile(packageJsonPath, 'utf-8');
+      const packagePath = join(packageJsonPath, "..");
+      const content = await readFile(packageJsonPath, "utf-8");
       const packageJson = JSON.parse(content);
 
       // Skip packages without name
@@ -122,7 +137,7 @@ async function discoverPackages(cwd: string): Promise<PackageInfo[]> {
 
       packages.push({
         name: packageJson.name,
-        path: relative(cwd, packagePath) || '.',
+        path: relative(cwd, packagePath) || ".",
       });
     } catch {
       // Skip invalid package.json
@@ -138,8 +153,8 @@ async function discoverPackages(cwd: string): Promise<PackageInfo[]> {
  */
 function createPackageNameRegex(pattern: string): RegExp {
   const escaped = pattern
-    .replace(/[.+?^${}()|[\]\\]/g, '\\$&') // Escape special chars
-    .replace(/\*/g, '.*'); // Convert * to .*
+    .replace(/[.+?^${}()|[\]\\]/g, "\\$&") // Escape special chars
+    .replace(/\*/g, ".*"); // Convert * to .*
   return new RegExp(`^${escaped}$`);
 }
 
@@ -151,6 +166,6 @@ function createGlobPattern(cwd: string, packages: PackageInfo[]): string {
     return `${packages[0].path}/**`;
   }
   // Multiple packages: {pkg1,pkg2}/**
-  const paths = packages.map((p) => p.path).join(',');
+  const paths = packages.map((p) => p.path).join(",");
   return `{${paths}}/**`;
 }

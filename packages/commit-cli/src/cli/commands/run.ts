@@ -25,13 +25,16 @@ import {
   type CommitRunOutput,
   type CommitPluginConfig,
   resolveCommitConfig,
-  commitFlags,
   type CommitFlags,
   commitEnv,
 } from '@kb-labs/commit-contracts';
 
-// Input type with backward compatibility
-type RunInput = CommitFlags & { argv?: string[] };
+// Input type with V3 handler compatibility
+// V3 handlers receive flags either in input.flags (CLI) or directly in input (REST API)
+type RunInput = CommitFlags & {
+  argv?: string[];
+  flags?: CommitFlags;
+};
 
 type RunResult = {
   exitCode: number;
@@ -57,12 +60,14 @@ export default defineCommand({
 
       const config = resolveCommitConfig(fileConfig ?? {}, env);
 
-      // V3: Flags come in input.flags object (not auto-merged)
-      const flags = (input as any).flags ?? input;
+      // V3: Flags come in input.flags (CLI) or directly in input (REST API)
+      const flags = input.flags ?? input;
       const effectiveScope = flags.scope ?? config.scope?.default;
       const dryRun = flags['dry-run'] ?? false;
       const withPush = flags['with-push'] ?? false;
       const outputJson = flags.json ?? false;
+      const allowSecrets = flags['allow-secrets'] ?? false;
+      const autoConfirm = flags.yes ?? false;
 
       // 1. Check for changes
       const statusLoader = useLoader('Checking git status...');
@@ -103,6 +108,8 @@ export default defineCommand({
         scope: effectiveScope,
         llmComplete,
         config,
+        allowSecrets,
+        autoConfirm,
         onProgress: (message) => analyzeLoader.update({ text: message }),
       });
 

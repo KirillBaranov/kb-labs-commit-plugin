@@ -155,10 +155,10 @@ async function getDiffStats(
 
         const lines = stdout.trim().split('\n');
         for (const line of lines) {
-          if (!line) continue;
+          if (!line) {continue;}
 
           const parts = line.split('\t');
-          if (parts.length < 3 || !parts[2]) continue;
+          if (parts.length < 3 || !parts[2]) {continue;}
 
           const additions = parseInt(parts[0] || '0', 10);
           const deletions = parseInt(parts[1] || '0', 10);

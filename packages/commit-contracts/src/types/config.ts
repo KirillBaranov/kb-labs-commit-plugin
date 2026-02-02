@@ -100,11 +100,11 @@ export interface CommitPluginConfig {
  * Must be declared in manifest.permissions.env.allow
  */
 export const COMMIT_ENV_VARS = [
-  'KB_COMMIT_LLM_ENABLED',
-  'KB_COMMIT_LLM_TEMPERATURE',
-  'KB_COMMIT_LLM_MAX_TOKENS',
-  'KB_COMMIT_STORAGE_DIR',
-  'KB_COMMIT_AUTO_STAGE',
+  "KB_COMMIT_LLM_ENABLED",
+  "KB_COMMIT_LLM_TEMPERATURE",
+  "KB_COMMIT_LLM_MAX_TOKENS",
+  "KB_COMMIT_STORAGE_DIR",
+  "KB_COMMIT_AUTO_STAGE",
 ] as const;
 
 export type CommitEnvVar = (typeof COMMIT_ENV_VARS)[number];
@@ -120,10 +120,10 @@ export const defaultCommitConfig: CommitPluginConfig = {
     maxTokens: 2000,
   },
   storage: {
-    directory: '.kb/commit',
+    directory: ".kb/commit",
   },
   git: {
-    protectedBranches: ['main', 'master'],
+    protectedBranches: ["main", "master"],
     autoStage: false,
   },
   scope: {
@@ -145,21 +145,38 @@ export function resolveCommitConfig(
     KB_COMMIT_LLM_MAX_TOKENS: number;
     KB_COMMIT_STORAGE_DIR: string;
     KB_COMMIT_AUTO_STAGE: boolean;
-  }> = {}
+  }> = {},
 ): CommitPluginConfig {
   const config: CommitPluginConfig = {
     enabled: fileConfig.enabled ?? defaultCommitConfig.enabled,
     llm: {
-      enabled: env.KB_COMMIT_LLM_ENABLED ?? fileConfig.llm?.enabled ?? defaultCommitConfig.llm.enabled,
-      temperature: env.KB_COMMIT_LLM_TEMPERATURE ?? fileConfig.llm?.temperature ?? defaultCommitConfig.llm.temperature,
-      maxTokens: env.KB_COMMIT_LLM_MAX_TOKENS ?? fileConfig.llm?.maxTokens ?? defaultCommitConfig.llm.maxTokens,
+      enabled:
+        env.KB_COMMIT_LLM_ENABLED ??
+        fileConfig.llm?.enabled ??
+        defaultCommitConfig.llm.enabled,
+      temperature:
+        env.KB_COMMIT_LLM_TEMPERATURE ??
+        fileConfig.llm?.temperature ??
+        defaultCommitConfig.llm.temperature,
+      maxTokens:
+        env.KB_COMMIT_LLM_MAX_TOKENS ??
+        fileConfig.llm?.maxTokens ??
+        defaultCommitConfig.llm.maxTokens,
     },
     storage: {
-      directory: env.KB_COMMIT_STORAGE_DIR ?? fileConfig.storage?.directory ?? defaultCommitConfig.storage.directory,
+      directory:
+        env.KB_COMMIT_STORAGE_DIR ??
+        fileConfig.storage?.directory ??
+        defaultCommitConfig.storage.directory,
     },
     git: {
-      protectedBranches: fileConfig.git?.protectedBranches ?? defaultCommitConfig.git.protectedBranches,
-      autoStage: env.KB_COMMIT_AUTO_STAGE ?? fileConfig.git?.autoStage ?? defaultCommitConfig.git.autoStage,
+      protectedBranches:
+        fileConfig.git?.protectedBranches ??
+        defaultCommitConfig.git.protectedBranches,
+      autoStage:
+        env.KB_COMMIT_AUTO_STAGE ??
+        fileConfig.git?.autoStage ??
+        defaultCommitConfig.git.autoStage,
     },
     scope: {
       default: fileConfig.scope?.default ?? defaultCommitConfig.scope?.default,

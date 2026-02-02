@@ -2,7 +2,7 @@
  * Recent commits analysis for style matching
  */
 
-import { simpleGit, type SimpleGit } from 'simple-git';
+import { simpleGit, type SimpleGit } from "simple-git";
 
 /**
  * Get recent commit messages for style reference
@@ -11,14 +11,17 @@ import { simpleGit, type SimpleGit } from 'simple-git';
  * @param count - Number of commits to retrieve (default: 10)
  * @returns Array of commit messages (subject line only)
  */
-export async function getRecentCommits(cwd: string, count: number = 10): Promise<string[]> {
+export async function getRecentCommits(
+  cwd: string,
+  count: number = 10,
+): Promise<string[]> {
   const git: SimpleGit = simpleGit(cwd);
 
   try {
     const log = await git.log({
       maxCount: count,
       format: {
-        message: '%s', // Subject line only
+        message: "%s", // Subject line only
       },
     });
 
@@ -48,8 +51,11 @@ export function detectCommitStyle(commits: string[]): {
   }
 
   // Check for conventional commit pattern: type(scope)?: message
-  const conventionalPattern = /^(feat|fix|docs|style|refactor|test|chore|ci|perf|build)(\([^)]+\))?!?:/i;
-  const conventionalMatches = commits.filter((c) => conventionalPattern.test(c));
+  const conventionalPattern =
+    /^(feat|fix|docs|style|refactor|test|chore|ci|perf|build)(\([^)]+\))?!?:/i;
+  const conventionalMatches = commits.filter((c) =>
+    conventionalPattern.test(c),
+  );
   const usesConventional = conventionalMatches.length >= commits.length * 0.5;
 
   // Extract scopes
@@ -74,7 +80,9 @@ export function detectCommitStyle(commits: string[]): {
     .map(([scope]) => scope);
 
   // Calculate average message length
-  const avgLength = Math.round(commits.reduce((sum, c) => sum + c.length, 0) / commits.length);
+  const avgLength = Math.round(
+    commits.reduce((sum, c) => sum + c.length, 0) / commits.length,
+  );
 
   return {
     usesConventional,

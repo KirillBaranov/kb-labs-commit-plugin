@@ -5,7 +5,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { join } from 'node:path';
 import { mkdir, writeFile, rm } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
 import { getGitStatus } from '../../src/analyzer/git-status';
 import { simpleGit } from 'simple-git';
 

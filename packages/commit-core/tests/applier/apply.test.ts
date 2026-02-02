@@ -186,7 +186,7 @@ describe('applyCommitPlan - scoped repositories', () => {
 
 describe('applyCommitPlan - path transformation edge cases', () => {
   const testRoot = join(process.cwd(), '.test-apply-paths');
-  const rootRepo = join(testRoot, 'kb-labs');
+  const _rootRepo = join(testRoot, 'kb-labs');
   const nestedRepo = join(testRoot, 'kb-labs', 'kb-labs-setup-engine');
 
   beforeEach(async () => {

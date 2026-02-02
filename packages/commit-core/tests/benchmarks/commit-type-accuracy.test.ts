@@ -3,14 +3,15 @@
  * Run with: pnpm test:benchmarks
  */
 
+/* eslint-disable no-await-in-loop -- Test suite requires sequential test case execution */
+
 import { describe, it, expect } from 'vitest';
 import { join } from 'node:path';
 import { writeFileSync } from 'node:fs';
-import type { FileSummary, CommitPlan } from '@kb-labs/commit-contracts';
-import { generateCommitPlan } from '../../packages/commit-core/src/generator/commit-plan';
+import type { CommitPlan } from '@kb-labs/commit-contracts';
 import { loadAllTestSuites } from './utils/test-case-loader';
 import { buildBenchmarkResults } from './utils/accuracy-calculator';
-import type { BenchmarkTestCase, TestCaseResult, BenchmarkResults } from './types';
+import type { BenchmarkTestCase, TestCaseResult } from './types';
 
 const TEST_CASES_DIR = join(__dirname, 'test-cases');
 const RESULTS_DIR = join(__dirname, '../../docs/benchmarks');
@@ -20,7 +21,7 @@ const RESULTS_DIR = join(__dirname, '../../docs/benchmarks');
  * This simulates what the LLM would return to test pattern detection + validation
  */
 function createMockLLMComplete() {
-  return async (prompt: string, options: any): Promise<{ content: string; tokensUsed: number }> => {
+  return async (prompt: string): Promise<{ content: string; tokensUsed: number }> => {
     // Parse files from prompt to generate mock response
     const fileMatches = prompt.match(/- (.+?) \((\w+),/g) || [];
     const files = fileMatches.map((m) => m.match(/- (.+?) \(/)![1]);
@@ -54,16 +55,6 @@ function createMockLLMComplete() {
  * Run a single benchmark test case
  */
 async function runTestCase(testCase: BenchmarkTestCase): Promise<TestCaseResult> {
-  // Convert test case files to FileSummary format
-  const summaries: FileSummary[] = testCase.files.map((f) => ({
-    path: f.path,
-    status: f.status,
-    additions: f.additions,
-    deletions: f.deletions,
-    isNewFile: f.isNewFile,
-    binary: f.binary ?? false,
-  }));
-
   // Mock git status
   const gitStatus = {
     staged: [],
@@ -76,7 +67,7 @@ async function runTestCase(testCase: BenchmarkTestCase): Promise<TestCaseResult>
   };
 
   // Generate commit plan (with mock LLM)
-  const mockLLM = createMockLLMComplete();
+  createMockLLMComplete();
 
   // HACK: We need to test WITHOUT actual LLM calls
   // For now, manually create a plan that simulates pattern detection working
@@ -106,7 +97,7 @@ async function runTestCase(testCase: BenchmarkTestCase): Promise<TestCaseResult>
       },
     };
 
-    const duration = Date.now() - startTime;
+    const _duration = Date.now() - startTime;
 
     // Compare with expected
     const actual = plan.commits[0];
@@ -148,7 +139,7 @@ async function runTestCase(testCase: BenchmarkTestCase): Promise<TestCaseResult>
         } : undefined,
       },
     };
-  } catch (error) {
+  } catch {
     // Test failed with error
     return {
       testCaseId: testCase.id,

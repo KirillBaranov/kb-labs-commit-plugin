@@ -8,14 +8,15 @@
  */
 export const COMMIT_EVENTS = {
   /** Scope selector changed */
-  SCOPE_CHANGED: 'scope:changed',
+  SCOPE_CHANGED: "scope:changed",
   /** Form submitted (actions widget) */
-  FORM_SUBMITTED: 'form:submitted',
+  FORM_SUBMITTED: "form:submitted",
   /** Commit plan generated */
-  PLAN_GENERATED: 'plan:generated',
+  PLAN_GENERATED: "plan:generated",
 } as const;
 
-export type CommitEventName = typeof COMMIT_EVENTS[keyof typeof COMMIT_EVENTS];
+export type CommitEventName =
+  (typeof COMMIT_EVENTS)[keyof typeof COMMIT_EVENTS];
 
 /**
  * Event payload types

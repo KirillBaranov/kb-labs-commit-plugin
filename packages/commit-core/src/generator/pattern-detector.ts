@@ -143,18 +143,18 @@ export function analyzePatterns(summaries: FileSummary[]): PatternAnalysis {
 export function isNewPackagePattern(summaries: FileSummary[]): boolean {
   // Must have package.json
   const hasPackageJson = summaries.some(s => s.path.endsWith('package.json'));
-  if (!hasPackageJson) return false;
+  if (!hasPackageJson) {return false;}
 
   // Must have 10+ files
-  if (summaries.length < 10) return false;
+  if (summaries.length < 10) {return false;}
 
   // All must be added
   const allAdded = summaries.every(s => s.status === 'added');
-  if (!allAdded) return false;
+  if (!allAdded) {return false;}
 
   // All must be truly new (not moved)
   const allIsNewFile = summaries.every(s => s.isNewFile === true);
-  if (!allIsNewFile) return false;
+  if (!allIsNewFile) {return false;}
 
   // All files should be in same package directory
   // Extract package path from package.json location
@@ -179,16 +179,16 @@ export function isNewPackagePattern(summaries: FileSummary[]): boolean {
  */
 export function isBulkMovePattern(summaries: FileSummary[]): boolean {
   // Must have 20+ files
-  if (summaries.length < 20) return false;
+  if (summaries.length < 20) {return false;}
 
   // All must be added
   const allAdded = summaries.every(s => s.status === 'added');
-  if (!allAdded) return false;
+  if (!allAdded) {return false;}
 
   // >50% must be "not new" (moved from elsewhere)
   const notNewCount = summaries.filter(s => s.isNewFile === false).length;
   const notNewRatio = notNewCount / summaries.length;
-  if (notNewRatio <= 0.5) return false;
+  if (notNewRatio <= 0.5) {return false;}
 
   // Files should be organized into <5 directories (depth 3)
   const uniqueDirs = countUniqueDirs(summaries, 3);
@@ -205,7 +205,7 @@ export function isBulkMovePattern(summaries: FileSummary[]): boolean {
 export function isRefactorModificationPattern(summaries: FileSummary[]): boolean {
   // All must be modified
   const allModified = summaries.every(s => s.status === 'modified');
-  if (!allModified) return false;
+  if (!allModified) {return false;}
 
   // Addition ratio must be low
   const additionRatio = calculateAdditionRatio(summaries);
@@ -250,7 +250,7 @@ export function calculateAdditionRatio(summaries: FileSummary[]): number {
   const totalDeletions = summaries.reduce((sum, s) => sum + s.deletions, 0);
   const totalChanges = totalAdditions + totalDeletions;
 
-  if (totalChanges === 0) return 0;
+  if (totalChanges === 0) {return 0;}
 
   return totalAdditions / totalChanges;
 }

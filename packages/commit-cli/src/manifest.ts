@@ -20,8 +20,6 @@ import {
   COMMIT_ENV_VARS,
   COMMIT_BASE_PATH,
   COMMIT_ROUTES,
-  COMMIT_WIDGET_ROUTES,
-  COMMIT_EVENTS,
   COMMIT_CACHE_PREFIX,
 } from '@kb-labs/commit-contracts';
 import {

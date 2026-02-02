@@ -2,6 +2,8 @@
  * Heuristic commit plan generation (fallback when LLM unavailable)
  */
 
+/* eslint-disable sonarjs/no-duplicate-string -- "package.json" string used repeatedly for file matching patterns */
+
 import type { FileSummary, CommitGroup, ConventionalType } from '@kb-labs/commit-contracts';
 import { dirname, extname, basename } from 'node:path';
 
@@ -206,7 +208,7 @@ function groupByCategory(summaries: FileSummary[]): Map<string, FileSummary[]> {
  */
 function inferPackageScope(paths: string[]): string | undefined {
   const packagePath = paths.find(p => p.endsWith('package.json'));
-  if (!packagePath) return undefined;
+  if (!packagePath) {return undefined;}
 
   // Extract monorepo package name from path
   // Example: kb-labs-cli/package.json -> kb-labs-cli
@@ -222,7 +224,7 @@ function inferPackageScope(paths: string[]): string | undefined {
  * Infer commit type from file changes (additions vs deletions)
  */
 function inferTypeFromChanges(file?: FileSummary): ConventionalType {
-  if (!file) return 'chore';
+  if (!file) {return 'chore';}
 
   const { additions, deletions, status } = file;
 
@@ -302,11 +304,11 @@ function categorizeFile(path: string): string {
  * Map category to conventional commit type
  */
 function categoryToType(category: string): ConventionalType {
-  if (category === 'test') return 'test';
-  if (category === 'docs') return 'docs';
-  if (category === 'config') return 'chore';
-  if (category === 'ci') return 'ci';
-  if (category === 'build') return 'build';
+  if (category === 'test') {return 'test';}
+  if (category === 'docs') {return 'docs';}
+  if (category === 'config') {return 'chore';}
+  if (category === 'ci') {return 'ci';}
+  if (category === 'build') {return 'build';}
   return 'chore'; // Default for src:* categories
 }
 
@@ -314,12 +316,12 @@ function categoryToType(category: string): ConventionalType {
  * Infer scope from file paths
  */
 function inferScope(paths: string[]): string | undefined {
-  if (paths.length === 0) return undefined;
+  if (paths.length === 0) {return undefined;}
 
   // Find common directory
   const dirs = paths.map((p) => dirname(p).split('/'));
   const firstDir = dirs[0];
-  if (!firstDir) return undefined;
+  if (!firstDir) {return undefined;}
 
   if (dirs.length === 1) {
     return firstDir.length > 1 ? firstDir[1] : firstDir[0];
@@ -351,6 +353,7 @@ function inferScope(paths: string[]): string | undefined {
 /**
  * Generate commit message
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- Message generation logic: checks file statuses (added/deleted/modified), file types (test/docs/config), count pluralization
 function generateMessage(type: ConventionalType, files: FileSummary[]): string {
   const count = files.length;
 
@@ -359,12 +362,12 @@ function generateMessage(type: ConventionalType, files: FileSummary[]): string {
   const allDeleted = files.every((f) => f.status === 'deleted');
 
   if (type === 'test') {
-    if (allAdded) return `add ${count} test file${count > 1 ? 's' : ''}`;
+    if (allAdded) {return `add ${count} test file${count > 1 ? 's' : ''}`;}
     return `update ${count} test file${count > 1 ? 's' : ''}`;
   }
 
   if (type === 'docs') {
-    if (allAdded) return `add documentation`;
+    if (allAdded) {return `add documentation`;}
     return `update documentation`;
   }
 

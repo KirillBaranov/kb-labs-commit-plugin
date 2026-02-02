@@ -22,7 +22,6 @@ export function calculateTypeMetrics(
   // True Positives: Predicted type AND expected type both match targetType
   const truePositives = results.filter((r) => {
     const actualType = r.actual.commits[0]?.type;
-    const expectedType = r.comparison.mismatches?.expectedType;
     return actualType === targetType && r.comparison.typeMatch;
   }).length;
 
@@ -34,8 +33,8 @@ export function calculateTypeMetrics(
 
   // False Negatives: Expected type is targetType but predicted type is different
   const falseNegatives = results.filter((r) => {
-    const expectedType = r.comparison.mismatches?.expectedType;
-    return expectedType === targetType && !r.comparison.typeMatch;
+    const _expectedType = r.comparison.mismatches?.expectedType;
+    return _expectedType === targetType && !r.comparison.typeMatch;
   }).length;
 
   const total = truePositives + falseNegatives;

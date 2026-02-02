@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 // ============================================================================
 // Core Types
@@ -8,15 +8,15 @@ import { z } from 'zod';
  * Conventional commit types
  */
 export const ConventionalTypeSchema = z.enum([
-  'feat',
-  'fix',
-  'refactor',
-  'chore',
-  'docs',
-  'test',
-  'build',
-  'ci',
-  'perf',
+  "feat",
+  "fix",
+  "refactor",
+  "chore",
+  "docs",
+  "test",
+  "build",
+  "ci",
+  "perf",
 ]);
 
 export type ConventionalType = z.infer<typeof ConventionalTypeSchema>;
@@ -24,7 +24,7 @@ export type ConventionalType = z.infer<typeof ConventionalTypeSchema>;
 /**
  * Release hint for semantic versioning
  */
-export const ReleaseHintSchema = z.enum(['none', 'patch', 'minor', 'major']);
+export const ReleaseHintSchema = z.enum(["none", "patch", "minor", "major"]);
 
 export type ReleaseHint = z.infer<typeof ReleaseHintSchema>;
 
@@ -48,7 +48,7 @@ export type GitStatus = z.infer<typeof GitStatusSchema>;
  */
 export const FileSummarySchema = z.object({
   path: z.string(),
-  status: z.enum(['added', 'modified', 'deleted', 'renamed', 'copied']),
+  status: z.enum(["added", "modified", "deleted", "renamed", "copied"]),
   additions: z.number().int().min(0),
   deletions: z.number().int().min(0),
   binary: z.boolean().default(false),
@@ -90,7 +90,7 @@ export const CommitGroupSchema = z.object({
   message: z.string().min(1),
   body: z.string().optional(),
   files: z.array(z.string()).min(1),
-  releaseHint: ReleaseHintSchema.default('none'),
+  releaseHint: ReleaseHintSchema.default("none"),
   breaking: z.boolean().default(false),
   /** Reasoning for commit type classification (optional, added by LLM) */
   reasoning: CommitReasoningSchema.optional(),
@@ -102,7 +102,7 @@ export type CommitGroup = z.infer<typeof CommitGroupSchema>;
  * Complete commit plan
  */
 export const CommitPlanSchema = z.object({
-  schemaVersion: z.literal('1.0'),
+  schemaVersion: z.literal("1.0"),
   createdAt: z.string().datetime(),
   repoRoot: z.string(),
   gitStatus: GitStatusSchema,
@@ -123,7 +123,7 @@ export type CommitPlan = z.infer<typeof CommitPlanSchema>;
  * Git status snapshot for storage
  */
 export const GitStatusSnapshotSchema = z.object({
-  schemaVersion: z.literal('1.0'),
+  schemaVersion: z.literal("1.0"),
   createdAt: z.string().datetime(),
   status: GitStatusSchema,
   summaries: z.array(FileSummarySchema),
@@ -153,7 +153,7 @@ export const CommitRunOutputSchema = z.object({
       id: z.string(),
       sha: z.string().optional(),
       message: z.string(),
-    })
+    }),
   ),
 });
 
@@ -187,7 +187,7 @@ export const ApplyOutputSchema = z.object({
       id: z.string(),
       sha: z.string(),
       message: z.string(),
-    })
+    }),
   ),
   errors: z.array(z.string()).default([]),
 });
@@ -244,7 +244,7 @@ export const ApplyResultSchema = z.object({
       groupId: z.string(),
       sha: z.string(),
       message: z.string(),
-    })
+    }),
   ),
   errors: z.array(z.string()),
 });

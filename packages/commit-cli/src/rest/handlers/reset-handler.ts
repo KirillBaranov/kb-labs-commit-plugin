@@ -1,6 +1,5 @@
 import { defineHandler, type PluginContextV3, type RestInput } from '@kb-labs/sdk';
 import {
-  ResetResponseSchema,
   type ResetResponse,
 } from '@kb-labs/commit-contracts';
 import { clearPlan } from '@kb-labs/commit-core/storage';

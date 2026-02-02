@@ -2,7 +2,7 @@
  * Benchmark test case types
  */
 
-import type { ConventionalType, FileSummary } from '@kb-labs/commit-contracts';
+import type { ConventionalType } from '@kb-labs/commit-contracts';
 import type { PatternType } from '../../packages/commit-core/src/generator/pattern-detector';
 
 /**

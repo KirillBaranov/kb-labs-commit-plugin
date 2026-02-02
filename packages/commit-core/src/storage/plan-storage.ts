@@ -2,6 +2,8 @@
  * Commit plan storage in .kb/commit/
  */
 
+/* eslint-disable no-await-in-loop -- Sequential file operations required for plan cleanup and history management */
+
 import { readFile, writeFile, mkdir, rm, readdir } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import type { CommitPlan, ApplyResult, GitStatusSnapshot } from '@kb-labs/commit-contracts';

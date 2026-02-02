@@ -36,11 +36,15 @@ export interface GenerateOptions {
   /** Recent commits for style reference */
   recentCommits?: string[];
   /** Plugin configuration (from kb.config.json + env) */
-  config?: import('@kb-labs/commit-contracts').CommitPluginConfig;
+  config?: import('@kb-labs/commit-contracts').CommitPluginConfig; // eslint-disable-line @typescript-eslint/consistent-type-imports
   /** Progress callback for UI updates (updates spinner text) */
   onProgress?: (message: string) => void;
   /** LLM completion function (optional - can be undefined if LLM disabled) */
   llmComplete?: LLMCompleteFunction;
+  /** Allow committing files with detected secrets (requires manual confirmation) */
+  allowSecrets?: boolean;
+  /** Auto-confirm all prompts (--yes flag for non-interactive mode) */
+  autoConfirm?: boolean;
 }
 
 /**
@@ -84,7 +88,7 @@ export type LLMCompleteFunction = (
  * Result of git status check with staleness info
  */
 export interface GitStatusWithStaleness {
-  status: import('@kb-labs/commit-contracts').GitStatus;
-  summaries: import('@kb-labs/commit-contracts').FileSummary[];
+  status: import('@kb-labs/commit-contracts').GitStatus; // eslint-disable-line @typescript-eslint/consistent-type-imports
+  summaries: import('@kb-labs/commit-contracts').FileSummary[]; // eslint-disable-line @typescript-eslint/consistent-type-imports
   hash: string;
 }

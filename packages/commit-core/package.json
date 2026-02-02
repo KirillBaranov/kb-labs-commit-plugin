@@ -43,7 +43,7 @@
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint . --fix",
     "type-check": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "test:benchmarks": "vitest run tests/benchmarks/commit-type-accuracy.test.ts",
     "test:all": "vitest run && vitest run tests/benchmarks/commit-type-accuracy.test.ts"

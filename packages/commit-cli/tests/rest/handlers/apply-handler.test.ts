@@ -2,7 +2,7 @@
  * Tests for apply-handler.ts - REST endpoint for commit application
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { join } from 'node:path';
 import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { simpleGit } from 'simple-git';

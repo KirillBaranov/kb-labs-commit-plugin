@@ -127,6 +127,62 @@ export const PlanResponseSchema = z.object({
 export type PlanResponse = z.infer<typeof PlanResponseSchema>;
 
 // ============================================================================
+// Patch Plan (Edit Commit)
+// ============================================================================
+
+/**
+ * PATCH /plan request body — edit a single commit in the plan
+ */
+export const PatchPlanRequestSchema = z.object({
+  scope: z.string().default("root"),
+  commitId: z.string().min(1),
+  message: z.string().min(1).optional(),
+  type: z.string().optional(),
+  scope_: z.string().optional(),
+  body: z.string().optional(),
+});
+
+export type PatchPlanRequest = z.infer<typeof PatchPlanRequestSchema>;
+
+/**
+ * PATCH /plan response
+ */
+export const PatchPlanResponseSchema = z.object({
+  success: z.boolean(),
+  scope: z.string().default("root"),
+  commitId: z.string(),
+});
+
+export type PatchPlanResponse = z.infer<typeof PatchPlanResponseSchema>;
+
+// ============================================================================
+// Regenerate Commit
+// ============================================================================
+
+/**
+ * POST /regenerate-commit request body
+ */
+export const RegenerateCommitRequestSchema = z.object({
+  scope: z.string().default("root"),
+  commitId: z.string().min(1),
+  instruction: z.string().optional(),
+});
+
+export type RegenerateCommitRequest = z.infer<typeof RegenerateCommitRequestSchema>;
+
+/**
+ * POST /regenerate-commit response
+ */
+export const RegenerateCommitResponseSchema = z.object({
+  success: z.boolean(),
+  scope: z.string().default("root"),
+  commitId: z.string(),
+  commit: CommitPlanSchema.shape.commits.element.optional(),
+});
+
+export type RegenerateCommitResponse = z.infer<typeof RegenerateCommitResponseSchema>;
+
+// ============================================================================
 // Apply Commits
 // ============================================================================
 
@@ -136,6 +192,8 @@ export type PlanResponse = z.infer<typeof PlanResponseSchema>;
 export const ApplyRequestSchema = z.object({
   scope: z.string().default("root"),
   force: z.boolean().default(false),
+  /** Optional: apply only specific commits by ID. If omitted, applies all. */
+  commitIds: z.array(z.string()).optional(),
 });
 
 export type ApplyRequest = z.infer<typeof ApplyRequestSchema>;

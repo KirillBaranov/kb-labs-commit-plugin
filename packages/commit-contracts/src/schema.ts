@@ -67,15 +67,15 @@ export type FileSummary = z.infer<typeof FileSummarySchema>;
  */
 export const CommitReasoningSchema = z.object({
   /** Does this change add NEW user-visible behavior? */
-  newBehavior: z.boolean(),
+  newBehavior: z.boolean().default(false),
   /** Does this change fix BROKEN functionality? */
-  fixesBug: z.boolean(),
+  fixesBug: z.boolean().default(false),
   /** Is this only INTERNAL restructuring? */
-  internalOnly: z.boolean(),
+  internalOnly: z.boolean().default(false),
   /** Human-readable explanation of why this type was chosen */
-  explanation: z.string(),
+  explanation: z.string().default(''),
   /** LLM confidence in this classification (0.0-1.0) */
-  confidence: z.number().min(0).max(1),
+  confidence: z.number().min(0).max(1).default(0.5),
 });
 
 export type CommitReasoning = z.infer<typeof CommitReasoningSchema>;

@@ -339,6 +339,31 @@ export const manifest = {
         zod: '@kb-labs/commit-contracts#ActionsResponseSchema',
       },
     },
+    // PATCH /plan — edit a single commit in the plan
+    {
+      method: 'PATCH',
+      path: COMMIT_ROUTES.PATCH_PLAN,
+      handler: './rest/handlers/patch-plan-handler.js#default',
+      input: {
+        zod: '@kb-labs/commit-contracts#PatchPlanRequestSchema',
+      },
+      output: {
+        zod: '@kb-labs/commit-contracts#PatchPlanResponseSchema',
+      },
+    },
+    // POST /regenerate-commit — regenerate a single commit with LLM
+    {
+      method: 'POST',
+      path: COMMIT_ROUTES.REGENERATE_COMMIT,
+      handler: './rest/handlers/regenerate-handler.js#default',
+      input: {
+        zod: '@kb-labs/commit-contracts#RegenerateCommitRequestSchema',
+      },
+      output: {
+        zod: '@kb-labs/commit-contracts#RegenerateCommitResponseSchema',
+      },
+      timeoutMs: 120000, // 2 minutes for LLM analysis
+    },
     ],
   },
 

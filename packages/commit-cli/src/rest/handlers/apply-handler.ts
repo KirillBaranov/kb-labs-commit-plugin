@@ -16,7 +16,7 @@ import { relative, normalize } from 'node:path';
  */
 export default defineHandler({
   async execute(ctx: PluginContextV3, input: RestInput<unknown, ApplyRequest>): Promise<ApplyResponse> {
-    const { scope = 'root', force } = input.body ?? {};
+    const { scope = 'root', force, commitIds } = input.body ?? {};
     const startTime = Date.now();
 
     try {
@@ -71,6 +71,16 @@ export default defineHandler({
           files: commit.files.map(stripScopePrefix),
         })),
       };
+
+      // Filter commits if specific commitIds requested (selective apply)
+      if (commitIds && commitIds.length > 0) {
+        const commitIdSet = new Set(commitIds);
+        transformedPlan.commits = transformedPlan.commits.filter(c => commitIdSet.has(c.id));
+
+        if (transformedPlan.commits.length === 0) {
+          throw new Error('None of the specified commitIds found in plan');
+        }
+      }
 
       // Apply commits (git runs FROM scopeCwd, not ctx.cwd!)
       const result = await applyCommitPlan(scopeCwd, transformedPlan, { force, scope });

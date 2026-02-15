@@ -11,7 +11,7 @@ export {
   isProtectedBranch,
 } from "./git-status";
 
-export { getFileSummaries, formatFileSummary } from "./file-summary";
+export { getFileSummaries, getFileDiffs, formatFileSummary } from "./file-summary";
 
 export { getFileDiff, type FileDiff } from "./file-diff";
 

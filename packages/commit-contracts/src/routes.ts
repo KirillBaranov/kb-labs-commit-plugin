@@ -52,6 +52,12 @@ export const COMMIT_ROUTES = {
 
   /** DELETE /plan - Delete current plan */
   RESET: "/plan",
+
+  /** PATCH /plan - Edit a single commit in the plan */
+  PATCH_PLAN: "/plan",
+
+  /** POST /regenerate-commit - Regenerate a single commit */
+  REGENERATE_COMMIT: "/regenerate-commit",
 } as const;
 
 /**
@@ -71,6 +77,8 @@ export const COMMIT_FULL_ROUTES = {
   APPLY: `${COMMIT_BASE_PATH}${COMMIT_ROUTES.APPLY}`,
   PUSH: `${COMMIT_BASE_PATH}${COMMIT_ROUTES.PUSH}`,
   RESET: `${COMMIT_BASE_PATH}${COMMIT_ROUTES.RESET}`,
+  PATCH_PLAN: `${COMMIT_BASE_PATH}${COMMIT_ROUTES.PATCH_PLAN}`,
+  REGENERATE_COMMIT: `${COMMIT_BASE_PATH}${COMMIT_ROUTES.REGENERATE_COMMIT}`,
 } as const;
 
 /**
@@ -90,6 +98,8 @@ export const COMMIT_WIDGET_ROUTES = {
   APPLY: "apply",
   PUSH: "push",
   RESET: "plan",
+  PATCH_PLAN: "plan",
+  REGENERATE_COMMIT: "regenerate-commit",
 } as const;
 
 export type CommitRoute = (typeof COMMIT_ROUTES)[keyof typeof COMMIT_ROUTES];

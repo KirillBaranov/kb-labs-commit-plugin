@@ -103,11 +103,13 @@ export async function loadPlan(cwd: string, scope: string = 'root'): Promise<Com
     // Validate with schema
     const result = CommitPlanSchema.safeParse(data);
     if (!result.success) {
+      console.error(`[loadPlan] Zod validation failed for ${planPath}:`, JSON.stringify(result.error.issues));
       return null;
     }
 
     return result.data;
-  } catch {
+  } catch (err) {
+    console.error(`[loadPlan] Failed to read ${planPath}:`, err instanceof Error ? err.message : err);
     return null;
   }
 }

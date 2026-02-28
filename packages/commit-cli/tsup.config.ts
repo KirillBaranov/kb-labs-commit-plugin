@@ -17,7 +17,7 @@ export default defineConfig({
     '@kb-labs/commit-contracts',
   ],
   dts: {
-    resolve: true,
+    resolve: false,
     skipLibCheck: true,
   },
   clean: true,

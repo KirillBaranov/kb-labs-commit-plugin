@@ -1,5 +1,6 @@
 import { defineHandler, type RestInput, type TableData, type TableRow, type PluginContextV3 } from '@kb-labs/sdk';
 import { getGitStatus } from '@kb-labs/commit-core/analyzer';
+import { COMMIT_CACHE_PREFIX } from '@kb-labs/commit-contracts';
 import { resolveScopePath } from './scope-resolver';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -33,7 +34,7 @@ export default defineHandler({
     const scope = input.query?.scope || 'root';
 
     // Check cache first
-    const cacheKey = `files-list:${scope}`;
+    const cacheKey = `${COMMIT_CACHE_PREFIX}files-list:${scope}`;
     const cached = await ctx.platform.cache.get(cacheKey);
 
     if (cached !== null && cached !== undefined) {

@@ -250,7 +250,7 @@ export const manifest = {
       output: {
         zod: '@kb-labs/commit-contracts#GenerateResponseSchema',
       },
-      timeoutMs: 120000, // 2 minutes for LLM analysis
+      timeoutMs: 300000, // 5 minutes for LLM analysis
     },
     // GET /plan
     {
@@ -362,7 +362,7 @@ export const manifest = {
       output: {
         zod: '@kb-labs/commit-contracts#RegenerateCommitResponseSchema',
       },
-      timeoutMs: 120000, // 2 minutes for LLM analysis
+      timeoutMs: 300000, // 5 minutes for LLM analysis
     },
     ],
   },

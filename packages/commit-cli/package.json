@@ -42,7 +42,7 @@
   "dependencies": {
     "@kb-labs/commit-contracts": "workspace:*",
     "@kb-labs/commit-core": "workspace:*",
-    "@kb-labs/sdk": "link:../../../kb-labs-sdk/packages/sdk",
+    "@kb-labs/sdk": "^1.0.0",
     "glob": "^11.0.0"
   },
   "devDependencies": {

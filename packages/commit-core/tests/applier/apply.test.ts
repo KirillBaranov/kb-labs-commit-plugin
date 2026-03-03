@@ -392,6 +392,53 @@ describe('applyCommitPlan - multiple commits', () => {
     expect(log.all).toHaveLength(1);
     expect(log.all[0]?.message).toContain('add file1');
   });
+
+  it('should fail preflight when file appears in multiple commits', async () => {
+    const plan: CommitPlan = {
+      schemaVersion: '1.0',
+      createdAt: new Date().toISOString(),
+      repoRoot: repo,
+      gitStatus: {
+        staged: [],
+        unstaged: ['src/file1.ts', 'src/file2.ts'],
+        untracked: [],
+      },
+      commits: [
+        {
+          id: 'c1',
+          type: 'feat',
+          scope: 'core',
+          message: 'add file1',
+          files: ['src/file1.ts'],
+          releaseHint: 'minor',
+          breaking: false,
+        },
+        {
+          id: 'c2',
+          type: 'feat',
+          scope: 'core',
+          message: 'duplicate file1 with file2',
+          files: ['src/file1.ts', 'src/file2.ts'],
+          releaseHint: 'minor',
+          breaking: false,
+        },
+      ],
+      metadata: {
+        totalFiles: 2,
+        totalCommits: 2,
+        llmUsed: false,
+        tokensUsed: 0,
+        escalated: false,
+      },
+    };
+
+    const result = await applyCommitPlan(repo, plan);
+
+    expect(result.success).toBe(false);
+    expect(result.appliedCommits).toHaveLength(0);
+    expect(result.errors.some(e => e.includes('File appears in multiple commits'))).toBe(true);
+  });
+
 });
 
 describe('applyCommitPlan - staging area isolation', () => {

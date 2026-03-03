@@ -80,17 +80,32 @@ export default defineHandler({
         if (transformedPlan.commits.length === 0) {
           throw new Error('None of the specified commitIds found in plan');
         }
+
+        // When selectively applying commits, align gitStatus to selected files only.
+        // Otherwise plan integrity checks may rightfully fail on intentionally skipped commits.
+        const selectedFiles = new Set(transformedPlan.commits.flatMap(c => c.files));
+        transformedPlan.gitStatus = {
+          staged: transformedPlan.gitStatus.staged.filter(f => selectedFiles.has(f)),
+          unstaged: transformedPlan.gitStatus.unstaged.filter(f => selectedFiles.has(f)),
+          untracked: transformedPlan.gitStatus.untracked.filter(f => selectedFiles.has(f)),
+        };
       }
 
       // Apply commits (git runs FROM scopeCwd, not ctx.cwd!)
+      // Reset applied status before attempt to avoid stale "Applied" badge after failed runs.
+      const appliedCacheKey = `${COMMIT_CACHE_PREFIX}plan-applied:${scope}`;
+      await ctx.platform.cache.delete(appliedCacheKey);
+
       const result = await applyCommitPlan(scopeCwd, transformedPlan, { force, scope });
 
       // Store applied status in cache for status tracking
       if (result.success) {
-        const appliedCacheKey = `${COMMIT_CACHE_PREFIX}plan-applied:${scope}`;
         await ctx.platform.cache.set(
           appliedCacheKey,
-          { commitsApplied: result.appliedCommits.length },
+          {
+            commitsApplied: result.appliedCommits.length,
+            planCreatedAt: plan.createdAt,
+          },
           60 * 60 * 1000 // 1 hour TTL
         );
       }

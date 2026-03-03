@@ -38,6 +38,69 @@ const CONFIDENCE_THRESHOLD = 0.7;
 
 /** Maximum retry attempts for LLM generation (both phases) */
 const MAX_LLM_RETRIES = 2;
+const VALID_COMMIT_TYPES = new Set(['feat', 'fix', 'refactor', 'chore', 'docs', 'test', 'build', 'ci', 'perf']);
+
+function normalizeCommitId(id: string | undefined): string | undefined {
+  if (!id) return undefined;
+  const trimmed = id.trim();
+  if (!trimmed) return undefined;
+
+  if (/^c\d+$/i.test(trimmed)) {
+    return `c${trimmed.replace(/^c/i, '')}`;
+  }
+
+  if (/^\d+$/.test(trimmed)) {
+    return `c${trimmed}`;
+  }
+
+  return trimmed;
+}
+
+function buildFallbackMessage(files: string[]): string {
+  const firstFile = files[0];
+  const fileName = firstFile ? firstFile.split('/').pop() ?? firstFile : 'files';
+  return files.length === 1 ? `update ${fileName}` : `update ${files.length} files`;
+}
+
+function toSafeCommitGroup(
+  commit: Partial<CommitGroup> & { files?: string[] },
+  id: string
+): CommitGroup | null {
+  const files = Array.isArray(commit.files)
+    ? commit.files.filter((file): file is string => typeof file === 'string' && file.length > 0)
+    : [];
+  if (files.length === 0) {
+    return null;
+  }
+
+  const uniqueFiles = [...new Set(files)];
+  const type = typeof commit.type === 'string' && VALID_COMMIT_TYPES.has(commit.type)
+    ? commit.type
+    : 'chore';
+  const message = typeof commit.message === 'string' && commit.message.trim().length > 0
+    ? commit.message.trim()
+    : buildFallbackMessage(uniqueFiles);
+  const releaseHint = commit.releaseHint
+    ?? (type === 'feat' ? 'minor' : (type === 'fix' || type === 'refactor' ? 'patch' : 'none'));
+
+  return {
+    id,
+    type,
+    scope: commit.scope,
+    message,
+    body: commit.body,
+    files: uniqueFiles,
+    releaseHint,
+    breaking: Boolean(commit.breaking),
+    reasoning: commit.reasoning ?? {
+      newBehavior: false,
+      fixesBug: false,
+      internalOnly: true,
+      explanation: 'Generated from Phase 3 fallback due invalid or incomplete LLM commit action.',
+      confidence: 0.3,
+    },
+  };
+}
 
 /**
  * Generate a commit plan from current git changes
@@ -695,11 +758,20 @@ PREFER extend_existing when possible to avoid creating unnecessary commits.`;
     let createdCount = 0;
 
     for (const commit of toolArgs.commits) {
+      if (!Array.isArray(commit.files) || commit.files.length === 0) {
+        await logger.warn('Phase 3: Skipping commit action with empty files', {
+          action: commit.action,
+          existingCommitId: commit.existingCommitId,
+        });
+        continue;
+      }
+
       const action = commit.action || 'create_new'; // Default to create_new for backward compatibility
 
       if (action === 'extend_existing') {
         // Find existing commit by ID
-        const existingCommit = existingCommits.find(c => c.id === commit.existingCommitId);
+        const normalizedRequestedId = normalizeCommitId(commit.existingCommitId);
+        const existingCommit = existingCommits.find(c => normalizeCommitId(c.id) === normalizedRequestedId);
         if (existingCommit) {
           // Add files to existing commit
           existingCommit.files.push(...commit.files);
@@ -713,24 +785,34 @@ PREFER extend_existing when possible to avoid creating unnecessary commits.`;
           // Fallback: create new commit if ID not found
           await logger.warn('Phase 3: Commit ID not found, creating new instead', {
             requestedId: commit.existingCommitId,
+            normalizedRequestedId,
+            availableIds: existingCommits.map(c => c.id).slice(0, 10),
           });
-          newCommits.push({
-            ...commit,
-            id: `c${existingCommits.length + newCommits.length + 1}`,
-            action: undefined, // Remove action field from final commit
-            existingCommitId: undefined,
-          } as CommitGroup);
-          createdCount++;
+          const safeCommit = toSafeCommitGroup(
+            commit,
+            `c${existingCommits.length + newCommits.length + 1}`
+          );
+          if (safeCommit) {
+            newCommits.push(safeCommit);
+            createdCount++;
+          } else {
+            await logger.warn('Phase 3: Fallback commit had no valid files, skipped', {
+              requestedId: commit.existingCommitId,
+            });
+          }
         }
       } else {
         // action === 'create_new'
-        newCommits.push({
-          ...commit,
-          id: `c${existingCommits.length + newCommits.length + 1}`,
-          action: undefined, // Remove action field from final commit
-          existingCommitId: undefined,
-        } as CommitGroup);
-        createdCount++;
+        const safeCommit = toSafeCommitGroup(
+          commit,
+          `c${existingCommits.length + newCommits.length + 1}`
+        );
+        if (safeCommit) {
+          newCommits.push(safeCommit);
+          createdCount++;
+        } else {
+          await logger.warn('Phase 3: create_new action had no valid files, skipped');
+        }
       }
     }
 

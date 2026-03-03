@@ -31,6 +31,16 @@ export async function applyCommitPlan(
   const appliedCommits: ApplyResult["appliedCommits"] = [];
   const errors: string[] = [];
 
+  // 0. Validate plan integrity before touching git state.
+  const integrityErrors = validatePlanIntegrity(plan);
+  if (integrityErrors.length > 0) {
+    return {
+      success: false,
+      appliedCommits: [],
+      errors: integrityErrors,
+    };
+  }
+
   // 1. Check for staleness (only for files in the plan, not entire repo)
   if (!options?.force) {
     const staleness = await checkStaleness(cwd, plan, options?.scope);
@@ -66,6 +76,31 @@ export async function applyCommitPlan(
     appliedCommits,
     errors,
   };
+}
+
+function validatePlanIntegrity(plan: CommitPlan): string[] {
+  const errors: string[] = [];
+  const seenInCommit = new Map<string, string>();
+
+  for (const commit of plan.commits) {
+    if (commit.files.length === 0) {
+      errors.push(`Commit ${commit.id} has no files`);
+      continue;
+    }
+
+    for (const file of commit.files) {
+      const firstCommit = seenInCommit.get(file);
+      if (firstCommit) {
+        errors.push(
+          `File appears in multiple commits: ${file} (first: ${firstCommit}, duplicate: ${commit.id})`,
+        );
+      } else {
+        seenInCommit.set(file, commit.id);
+      }
+    }
+  }
+
+  return errors;
 }
 
 /**

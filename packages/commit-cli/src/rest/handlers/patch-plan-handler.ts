@@ -1,5 +1,6 @@
 import { defineHandler, type PluginContextV3, type RestInput } from '@kb-labs/sdk';
 import {
+  COMMIT_CACHE_PREFIX,
   type PatchPlanRequest,
   type PatchPlanResponse,
   ConventionalTypeSchema,
@@ -50,6 +51,10 @@ export default defineHandler({
 
     plan.commits[commitIndex] = commit;
     await savePlan(ctx.cwd, plan, scope);
+
+    // Plan content changed => previously applied state is stale.
+    const appliedCacheKey = `${COMMIT_CACHE_PREFIX}plan-applied:${scope}`;
+    await ctx.platform.cache.delete(appliedCacheKey);
 
     return {
       success: true,

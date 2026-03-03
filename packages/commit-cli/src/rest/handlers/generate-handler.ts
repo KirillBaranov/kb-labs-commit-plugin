@@ -1,5 +1,6 @@
 import { defineHandler, type PluginContextV3, type RestInput } from '@kb-labs/sdk';
 import {
+  COMMIT_CACHE_PREFIX,
   type GenerateRequest,
   type GenerateResponse,
 } from '@kb-labs/commit-contracts';
@@ -36,6 +37,10 @@ export default defineHandler({
       if (!dryRun) {
         await savePlan(ctx.cwd, plan, scope);
         planPath = getCurrentPlanPath(ctx.cwd, scope);
+
+        // New plan invalidates previously applied state for this scope.
+        const appliedCacheKey = `${COMMIT_CACHE_PREFIX}plan-applied:${scope}`;
+        await ctx.platform.cache.delete(appliedCacheKey);
       }
 
       // Track success

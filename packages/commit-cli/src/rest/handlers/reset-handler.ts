@@ -1,5 +1,6 @@
 import { defineHandler, type PluginContextV3, type RestInput } from '@kb-labs/sdk';
 import {
+  COMMIT_CACHE_PREFIX,
   type ResetResponse,
 } from '@kb-labs/commit-contracts';
 import { clearPlan } from '@kb-labs/commit-core/storage';
@@ -15,6 +16,8 @@ export default defineHandler({
 
     try {
       await clearPlan(ctx.cwd, scope);
+      const appliedCacheKey = `${COMMIT_CACHE_PREFIX}plan-applied:${scope}`;
+      await ctx.platform.cache.delete(appliedCacheKey);
 
       return {
         success: true,

@@ -2,6 +2,8 @@ import { defineHandler, type PluginContextV3, type RestInput, useLogger } from '
 import { type FileDiffResponse } from '@kb-labs/commit-contracts';
 import { getFileDiff } from '@kb-labs/commit-core/analyzer';
 import { resolveScopePath } from './scope-resolver';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
 /**
  * GET /diff handler
@@ -28,6 +30,28 @@ export default defineHandler({
       // Get file diff (git runs FROM scopeCwd)
       logger.info('[diff-handler] Calling getFileDiff', { cwd: scopeCwd, file });
       const result = await getFileDiff(scopeCwd, file);
+
+      // For untracked/new files git diff may be empty.
+      // Fallback to raw file content so UI can render a "new file content" view.
+      if (!result.diff || result.diff.trim().length === 0) {
+        try {
+          const absolutePath = join(scopeCwd, file);
+          const content = await readFile(absolutePath, 'utf-8');
+          const additions = content.length === 0 ? 0 : content.split('\n').length;
+          return {
+            scope,
+            file,
+            diff: content,
+            additions,
+            deletions: 0,
+          };
+        } catch (readError) {
+          logger.warn('[diff-handler] Failed to read file content fallback', {
+            file,
+            error: readError instanceof Error ? readError.message : String(readError),
+          });
+        }
+      }
 
       return {
         scope,

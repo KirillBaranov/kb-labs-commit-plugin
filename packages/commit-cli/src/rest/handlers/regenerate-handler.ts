@@ -1,6 +1,7 @@
 import { defineHandler, type PluginContextV3, type RestInput, useLLM, useLogger } from '@kb-labs/sdk';
 import type { LLMMessage } from '@kb-labs/sdk';
 import {
+  COMMIT_CACHE_PREFIX,
   type RegenerateCommitRequest,
   type RegenerateCommitResponse,
   type CommitGroup,
@@ -107,6 +108,10 @@ ${fileContext}`;
       // Replace in plan
       plan.commits[commitIndex] = regeneratedCommit;
       await savePlan(ctx.cwd, plan, scope);
+
+      // Regenerated plan is no longer considered applied.
+      const appliedCacheKey = `${COMMIT_CACHE_PREFIX}plan-applied:${scope}`;
+      await ctx.platform.cache.delete(appliedCacheKey);
 
       await logger.info('[regenerate-handler] Commit regenerated', {
         scope,

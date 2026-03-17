@@ -72,9 +72,15 @@ export default defineHandler({
         const appliedData = await ctx.platform.cache.get(appliedCacheKey);
 
         if (appliedData) {
-          const applied = appliedData as { commitsApplied: number };
-          commitsApplied = applied.commitsApplied;
-          planStatus = 'applied';
+          const applied = appliedData as { commitsApplied: number; planCreatedAt?: string };
+          // Only trust applied marker if it belongs to the current plan version.
+          if (!applied.planCreatedAt || applied.planCreatedAt === plan.createdAt) {
+            commitsApplied = applied.commitsApplied;
+            planStatus = 'applied';
+          } else {
+            await ctx.platform.cache.delete(appliedCacheKey);
+            planStatus = 'ready';
+          }
         } else {
           planStatus = 'ready';
         }

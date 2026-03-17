@@ -41,9 +41,9 @@ const MAX_LLM_RETRIES = 2;
 const VALID_COMMIT_TYPES = new Set(['feat', 'fix', 'refactor', 'chore', 'docs', 'test', 'build', 'ci', 'perf']);
 
 function normalizeCommitId(id: string | undefined): string | undefined {
-  if (!id) return undefined;
+  if (!id) { return undefined; }
   const trimmed = id.trim();
-  if (!trimmed) return undefined;
+  if (!trimmed) { return undefined; }
 
   if (/^c\d+$/i.test(trimmed)) {
     return `c${trimmed.replace(/^c/i, '')}`;

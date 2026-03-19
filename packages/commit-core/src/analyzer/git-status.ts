@@ -32,8 +32,9 @@ export async function getGitStatus(
   }
 
   // Regular git status from cwd
+  // --ignore-submodules=all: exclude submodule pointer drift in worktrees
   const git: SimpleGit = simpleGit(cwd);
-  const status: StatusResult = await git.status();
+  const status: StatusResult = await git.status(['--ignore-submodules=all']);
 
   return {
     staged: status.staged.filter((f) => !shouldIgnoreFile(f)),

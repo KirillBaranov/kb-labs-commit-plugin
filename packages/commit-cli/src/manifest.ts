@@ -367,11 +367,34 @@ export const manifest = {
     ],
   },
 
-  // Studio UI widgets
-  // TODO: Temporarily disabled - using custom page in kb-labs-studio instead
-  // Will re-enable when widget UI is fully polished
-  /*
+  // Studio V2 — Module Federation pages
   studio: {
+    version: 2 as const,
+    remoteName: 'commitPlugin',
+    pages: [
+      {
+        id: 'commit.overview',
+        title: 'Commit',
+        icon: 'GitlabOutlined',
+        route: '/p/commit',
+        entry: './CommitOverview',
+        order: 1,
+      },
+    ],
+    menus: [
+      {
+        id: 'commit',
+        label: 'Commit',
+        icon: 'GitlabOutlined',
+        target: 'commit.overview',
+        order: 30,
+      },
+    ],
+  },
+
+  // Legacy V1 studio widgets (deleted)
+  /*
+  _legacy_studio: {
     widgets: [
     // Workspace Selector
     {

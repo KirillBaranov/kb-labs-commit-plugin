@@ -1,0 +1,39 @@
+{
+  "name": "@kb-labs/commit-pages",
+  "version": "0.1.0",
+  "description": "Commit plugin Studio pages — Module Federation remote",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint . --max-warnings=0"
+  },
+  "dependencies": {
+    "@kb-labs/sdk": "link:../../../../platform/kb-labs-sdk/packages/sdk",
+    "@kb-labs/studio-hooks": "link:../../../../platform/kb-labs-studio/packages/studio-hooks",
+    "@kb-labs/studio-event-bus": "link:../../../../platform/kb-labs-studio/packages/studio-event-bus",
+    "@kb-labs/studio-ui-kit": "link:../../../../platform/kb-labs-studio/packages/studio-ui-kit"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "antd": "^5.21.0",
+    "@ant-design/icons": "^5.4.0",
+    "@tanstack/react-query": "^5.0.0",
+    "react-router-dom": "^7.0.0"
+  },
+  "devDependencies": {
+    "@kb-labs/studio-plugin-tools": "link:../../../../platform/kb-labs-studio/packages/studio-plugin-tools",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.7"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

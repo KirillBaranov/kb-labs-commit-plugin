@@ -31,8 +31,11 @@
   "scripts": {
     "pretype-check": "pnpm --filter @kb-labs/commit-cli build",
     "clean": "rimraf dist",
-    "build": "tsup --config tsup.config.ts",
+    "build": "tsup --config tsup.config.ts && pnpm run build:studio",
+    "build:cli": "tsup --config tsup.config.ts",
+    "build:studio": "vite build --config vite.studio.config.ts",
     "dev": "tsup --config tsup.config.ts --watch",
+    "dev:studio": "vite --config vite.studio.config.ts",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint . --fix",
     "type-check": "tsc --noEmit",
@@ -45,12 +48,37 @@
     "@kb-labs/sdk": "link:../../../../platform/kb-labs-sdk/packages/sdk",
     "glob": "^11.0.0"
   },
+  "peerDependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "antd": "^5.21.0",
+    "@ant-design/icons": "^5.4.0",
+    "@tanstack/react-query": "^5.0.0",
+    "react-router-dom": "^7.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": { "optional": true },
+    "react-dom": { "optional": true },
+    "antd": { "optional": true },
+    "@ant-design/icons": { "optional": true },
+    "@tanstack/react-query": { "optional": true },
+    "react-router-dom": { "optional": true }
+  },
   "devDependencies": {
     "@kb-labs/devkit": "link:../../../../infra/kb-labs-devkit",
+    "@kb-labs/studio-plugin-tools": "link:../../../../platform/kb-labs-studio/packages/studio-plugin-tools",
+    "@kb-labs/studio-hooks": "link:../../../../platform/kb-labs-studio/packages/studio-hooks",
+    "@kb-labs/studio-event-bus": "link:../../../../platform/kb-labs-studio/packages/studio-event-bus",
+    "@kb-labs/studio-ui-kit": "link:../../../../platform/kb-labs-studio/packages/studio-ui-kit",
+    "@kb-labs/studio-ui-core": "link:../../../../platform/kb-labs-studio/packages/studio-ui-core",
     "@types/node": "^24.3.3",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
     "rimraf": "^6.0.1",
     "tsup": "^8.5.0",
     "typescript": "^5.6.3",
+    "vite": "^6.0.7",
     "vitest": "^3.2.4"
   },
   "engines": {

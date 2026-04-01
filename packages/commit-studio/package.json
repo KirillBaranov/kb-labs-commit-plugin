@@ -1,7 +1,7 @@
 {
-  "name": "@kb-labs/commit-pages",
+  "name": "@kb-labs/commit-studio",
   "version": "0.1.0",
-  "description": "Commit plugin Studio pages — Module Federation remote",
+  "description": "Commit plugin Studio UI — Module Federation remote",
   "type": "module",
   "private": true,
   "scripts": {

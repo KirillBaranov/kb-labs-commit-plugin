@@ -1,8 +1,10 @@
-import { defineHandler, type PluginContextV3, type RestInput } from '@kb-labs/sdk';
+import { defineHandler, useConfig, type PluginContextV3, type RestInput } from '@kb-labs/sdk';
 import {
   COMMIT_CACHE_PREFIX,
   type PushRequest,
   type PushResponse,
+  type CommitPluginConfig,
+  resolveCommitConfig,
 } from '@kb-labs/commit-contracts';
 import { pushCommits } from '@kb-labs/commit-core/applier';
 import { loadPlan, saveToHistory, clearPlan } from '@kb-labs/commit-core/storage';
@@ -24,7 +26,9 @@ export default defineHandler({
       const plan = await loadPlan(ctx.cwd, scope);
 
       // Resolve scope to actual directory path
-      const scopeCwd = resolveScopePath(ctx.cwd, scope);
+      const fileConfig = await useConfig<Partial<CommitPluginConfig>>();
+      const config = resolveCommitConfig(fileConfig ?? {});
+      const scopeCwd = resolveScopePath(ctx.cwd, scope, config.scope?.scopes);
 
       // Push commits (git runs FROM scopeCwd)
       const result = await pushCommits(scopeCwd, { remote, force, scope });

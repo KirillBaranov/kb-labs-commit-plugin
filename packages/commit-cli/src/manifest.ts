@@ -62,6 +62,7 @@ export const manifest = {
   schema: 'kb.plugin/3',
   id: '@kb-labs/commit',
   version: '0.1.0',
+  configSection: 'commit',
 
   display: {
     name: 'Commit Generator',
@@ -272,6 +273,7 @@ export const manifest = {
       output: {
         zod: '@kb-labs/commit-contracts#ApplyResponseSchema',
       },
+      timeoutMs: 600000, // 10 min for pre/post hooks
     },
     // POST /push
     {
@@ -284,6 +286,7 @@ export const manifest = {
       output: {
         zod: '@kb-labs/commit-contracts#PushResponseSchema',
       },
+      timeoutMs: 600000, // 10 min for pre/post push hooks
     },
     // DELETE /plan
     {

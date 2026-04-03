@@ -1,5 +1,5 @@
-import { defineHandler, type PluginContextV3, type RestInput, useLogger, useLLM } from '@kb-labs/sdk';
-import { type SummarizeRequest, type SummarizeResponse } from '@kb-labs/commit-contracts';
+import { defineHandler, useConfig, type PluginContextV3, type RestInput, useLogger, useLLM } from '@kb-labs/sdk';
+import { type SummarizeRequest, type SummarizeResponse, type CommitPluginConfig, resolveCommitConfig } from '@kb-labs/commit-contracts';
 import { getFileDiff, getAllChangedFiles, getGitStatus } from '@kb-labs/commit-core/analyzer';
 import { resolveScopePath } from './scope-resolver';
 
@@ -25,7 +25,9 @@ export default defineHandler({
 
     try {
       // Resolve scope to actual directory path
-      const scopeCwd = resolveScopePath(ctx.cwd, scope);
+      const fileConfig = await useConfig<Partial<CommitPluginConfig>>();
+      const config = resolveCommitConfig(fileConfig ?? {});
+      const scopeCwd = resolveScopePath(ctx.cwd, scope, config.scope?.scopes);
       logger.info('[summarize-handler] Resolved scope', { scope, scopeCwd });
 
       let prompt: string;

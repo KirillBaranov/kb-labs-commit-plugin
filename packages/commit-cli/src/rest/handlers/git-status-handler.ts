@@ -1,5 +1,6 @@
-import { defineHandler, type PluginContextV3, type TableData, type TableRow, type RestInput } from '@kb-labs/sdk';
+import { defineHandler, useConfig, type PluginContextV3, type RestInput, type TableData, type TableRow } from '@kb-labs/sdk';
 import { getGitStatus } from '@kb-labs/commit-core/analyzer';
+import { type CommitPluginConfig, resolveCommitConfig } from '@kb-labs/commit-contracts';
 import { resolveScopePath } from './scope-resolver';
 
 /**
@@ -13,7 +14,9 @@ export default defineHandler({
 
     try {
       // Resolve scope to actual directory path
-      const scopeCwd = resolveScopePath(ctx.cwd, scope);
+      const fileConfig = await useConfig<Partial<CommitPluginConfig>>();
+      const config = resolveCommitConfig(fileConfig ?? {});
+      const scopeCwd = resolveScopePath(ctx.cwd, scope, config.scope?.scopes);
 
       ctx.platform.logger.info('[git-status] Resolution', {
         cwd: ctx.cwd,

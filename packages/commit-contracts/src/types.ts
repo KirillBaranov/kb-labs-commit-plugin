@@ -38,6 +38,8 @@ export type {
   StorageConfig,
   GitConfig,
   CommitEnvVar,
+  CommitScope,
+  ScopeConfig,
 } from "./types/config";
 export {
   defaultCommitConfig,

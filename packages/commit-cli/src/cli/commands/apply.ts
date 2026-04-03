@@ -3,14 +3,16 @@
  * Apply current commit plan
  */
 
-import { defineCommand, useLoader, findRepoRoot, type PluginContextV3 } from '@kb-labs/sdk';
+import { defineCommand, useLoader, useConfig, findRepoRoot, type PluginContextV3 } from '@kb-labs/sdk';
 import {
   applyCommitPlan,
   loadPlan,
   saveToHistory,
   clearPlan,
 } from '@kb-labs/commit-core';
-import type { ApplyOutput } from '@kb-labs/commit-contracts';
+import type { ApplyOutput, CommitPluginConfig } from '@kb-labs/commit-contracts';
+import { resolveCommitConfig } from '@kb-labs/commit-contracts';
+import { resolveScopePath } from '../../rest/handlers/scope-resolver';
 
 type ApplyInput = {
   force?: boolean;
@@ -34,6 +36,9 @@ export default defineCommand({
       const cwd = (await findRepoRoot(ctx.cwd || process.cwd())) ?? process.cwd();
 
       const scope = input.scope ?? 'root';
+      const fileConfig = await useConfig<Partial<CommitPluginConfig>>();
+      const config = resolveCommitConfig(fileConfig ?? {});
+      const scopeCwd = resolveScopePath(cwd, scope, config.scope?.scopes);
 
       // Load current plan
       const loadLoader = useLoader('Loading commit plan...');
@@ -68,7 +73,7 @@ export default defineCommand({
       // Apply plan
       const applyLoader = useLoader(`Applying ${plan.commits.length} commit(s)...`);
       applyLoader.start();
-      const result = await applyCommitPlan(cwd, plan, {
+      const result = await applyCommitPlan(scopeCwd, plan, {
         force: input.force,
       });
 

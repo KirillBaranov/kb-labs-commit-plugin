@@ -4,47 +4,56 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useData, useTheme } from '@kb-labs/sdk/studio';
-import { UIPage, UIHeader } from '@kb-labs/studio-ui-kit';
-import { UITabs, UISelect } from '@kb-labs/studio-ui-kit';
+import { useData, UIPage, UIPageHeader, UITabs, UISelect, type SelectData } from '@kb-labs/sdk/studio';
 import { CommitPlanTab } from '../components/CommitPlanTab';
 import { CommitFilesTab } from '../components/CommitFilesTab';
 
-interface Scope {
-  id: string;
-  name: string;
-  path: string;
-}
-
 export default function CommitOverview() {
-  const { semantic } = useTheme();
   const [scope, setScope] = useState<string>('');
 
-  const { data: scopesData, isLoading: scopesLoading } = useData<{ scopes: Scope[] }>(
+  const { data: scopesData, isLoading: scopesLoading } = useData<SelectData>(
     '/v1/plugins/commit/scopes',
   );
 
   // Auto-select first scope
   useEffect(() => {
-    if (scopesData?.scopes?.length && !scope) {
-      setScope(scopesData.scopes[0]!.id);
+    if (scopesData?.options?.length && !scope) {
+      setScope(scopesData.value || scopesData.options[0]!.value);
     }
   }, [scopesData, scope]);
 
-  const scopeOptions = scopesData?.scopes?.map((s) => ({
-    label: s.name,
-    value: s.id,
+  const scopeOptions = scopesData?.options?.map((s) => ({
+    label: s.label,
+    value: s.value,
   })) ?? [];
+
+  const tabs = (
+    <UITabs
+      syncUrl="search"
+      items={[
+        {
+          key: 'plan',
+          label: 'Commit Plan',
+          children: <CommitPlanTab scope={scope} />,
+        },
+        {
+          key: 'files',
+          label: 'Files',
+          children: <CommitFilesTab scope={scope} />,
+        },
+      ]}
+    />
+  );
 
   return (
     <UIPage>
-      <UIHeader
+      <UIPageHeader
         title="Commit"
-        subtitle="AI-powered commit generation"
+        description="AI-powered commit generation"
         actions={
           <UISelect
-            style={{ width: 300 }}
-            placeholder="Select scope..."
+            style={{ width: 260 }}
+            placeholder="Select repository..."
             value={scope || undefined}
             onChange={(v) => setScope(v as string)}
             loading={scopesLoading}
@@ -52,22 +61,7 @@ export default function CommitOverview() {
             options={scopeOptions}
           />
         }
-      />
-
-      <UITabs
-        size="large"
-        items={[
-          {
-            key: 'plan',
-            label: 'Commit Plan',
-            children: <CommitPlanTab scope={scope} />,
-          },
-          {
-            key: 'files',
-            label: 'Files',
-            children: <CommitFilesTab scope={scope} />,
-          },
-        ]}
+        tabs={tabs}
       />
     </UIPage>
   );

@@ -1,10 +1,12 @@
-import { defineHandler, type PluginContextV3, type RestInput, useLLM, useLogger } from '@kb-labs/sdk';
+import { defineHandler, useConfig, type PluginContextV3, type RestInput, useLLM, useLogger } from '@kb-labs/sdk';
 import type { LLMMessage } from '@kb-labs/sdk';
 import {
   COMMIT_CACHE_PREFIX,
   type RegenerateCommitRequest,
   type RegenerateCommitResponse,
   type CommitGroup,
+  type CommitPluginConfig,
+  resolveCommitConfig,
 } from '@kb-labs/commit-contracts';
 import { loadPlan, savePlan } from '@kb-labs/commit-core/storage';
 import { getFileSummaries, getFileDiffs } from '@kb-labs/commit-core/analyzer';
@@ -50,7 +52,9 @@ export default defineHandler({
 
     try {
       // Resolve scope for file operations
-      const scopeCwd = resolveScopePath(ctx.cwd, scope);
+      const fileConfig = await useConfig<Partial<CommitPluginConfig>>();
+      const config = resolveCommitConfig(fileConfig ?? {});
+      const scopeCwd = resolveScopePath(ctx.cwd, scope, config.scope?.scopes);
 
       // Get fresh file summaries and diffs
       const summaries = await getFileSummaries(scopeCwd, files);

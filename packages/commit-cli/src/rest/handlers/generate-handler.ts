@@ -1,12 +1,15 @@
-import { defineHandler, type PluginContextV3, type RestInput } from '@kb-labs/sdk';
+import { defineHandler, useConfig, type PluginContextV3, type RestInput } from '@kb-labs/sdk';
 import {
   COMMIT_CACHE_PREFIX,
   type GenerateRequest,
   type GenerateResponse,
+  type CommitPluginConfig,
+  resolveCommitConfig,
 } from '@kb-labs/commit-contracts';
 import { generateCommitPlan } from '@kb-labs/commit-core/generator';
 import { savePlan, getCurrentPlanPath } from '@kb-labs/commit-core/storage';
 import { SecretsDetectedError } from '@kb-labs/commit-core/analyzer';
+import { resolveScopePath } from './scope-resolver';
 
 /**
  * POST /generate handler
@@ -20,11 +23,12 @@ export default defineHandler({
     const startTime = Date.now();
 
     try {
-      // Generate plan with scope - generator will resolve it internally
-      // LLM access is handled via useLLM() hook inside generateCommitPlan
+      const fileConfig = await useConfig<Partial<CommitPluginConfig>>();
+      const config = resolveCommitConfig(fileConfig ?? {});
+      const scopeCwd = resolveScopePath(ctx.cwd, scope, config.scope?.scopes);
+
       const plan = await generateCommitPlan({
-        cwd: ctx.cwd,
-        scope: scope === 'root' ? undefined : scope,
+        cwd: scopeCwd,
         allowSecrets,
         autoConfirm,
         onProgress: (message) => {

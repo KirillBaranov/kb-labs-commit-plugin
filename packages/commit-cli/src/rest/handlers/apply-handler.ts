@@ -1,8 +1,10 @@
-import { defineHandler, type PluginContextV3, type RestInput } from '@kb-labs/sdk';
+import { defineHandler, useConfig, type PluginContextV3, type RestInput } from '@kb-labs/sdk';
 import {
   COMMIT_CACHE_PREFIX,
   type ApplyRequest,
   type ApplyResponse,
+  type CommitPluginConfig,
+  resolveCommitConfig,
 } from '@kb-labs/commit-contracts';
 import { applyCommitPlan } from '@kb-labs/commit-core/applier';
 import { loadPlan } from '@kb-labs/commit-core/storage';
@@ -20,8 +22,11 @@ export default defineHandler({
     const startTime = Date.now();
 
     try {
+      const fileConfig = await useConfig<Partial<CommitPluginConfig>>();
+      const config = resolveCommitConfig(fileConfig ?? {});
+
       // Resolve scope to actual directory path (for nested git repos)
-      const scopeCwd = resolveScopePath(ctx.cwd, scope);
+      const scopeCwd = resolveScopePath(ctx.cwd, scope, config.scope?.scopes);
 
       // Load the plan first (plan stored in root, but paths are relative to repoRoot)
       const plan = await loadPlan(ctx.cwd, scope);

@@ -1,7 +1,7 @@
-import { defineHandler, type RestInput, type PluginContextV3 } from '@kb-labs/sdk';
+import { defineHandler, useConfig, type RestInput, type PluginContextV3 } from '@kb-labs/sdk';
 import { loadPlan } from '@kb-labs/commit-core/storage';
 import { getGitStatus } from '@kb-labs/commit-core/analyzer';
-import { COMMIT_CACHE_PREFIX, type StatusResponse, type PlanStatus } from '@kb-labs/commit-contracts';
+import { COMMIT_CACHE_PREFIX, type StatusResponse, type PlanStatus, type CommitPluginConfig, resolveCommitConfig } from '@kb-labs/commit-contracts';
 import { resolveScopePath } from './scope-resolver';
 
 const STATUS_CACHE_TTL = 5000; // 5 seconds
@@ -41,7 +41,9 @@ export default defineHandler({
       } else {
         // Fetch fresh git status
         // Resolve scope to actual directory path (same as files-handler)
-        const scopeCwd = resolveScopePath(ctx.cwd, scope);
+        const fileConfig = await useConfig<Partial<CommitPluginConfig>>();
+        const config = resolveCommitConfig(fileConfig ?? {});
+        const scopeCwd = resolveScopePath(ctx.cwd, scope, config.scope?.scopes);
         ctx.platform.logger.info(`[status-handler] Resolved scope CWD: ${scopeCwd}`);
 
         gitStatus = await getGitStatus(scopeCwd);

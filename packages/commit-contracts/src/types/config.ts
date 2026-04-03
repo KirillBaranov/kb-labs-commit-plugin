@@ -40,17 +40,44 @@ export interface GitConfig {
 }
 
 /**
+ * A single commit scope definition
+ */
+export interface CommitScope {
+  /** Scope identifier — used as value in selector and in API requests */
+  id: string;
+  /** Display label shown in Studio UI */
+  label: string;
+  /**
+   * Relative path from workspace root to the target git repository.
+   * Use "." for the workspace root itself.
+   * @example "."
+   * @example "public/kb-labs"
+   * @example "plugins/kb-labs-mind"
+   */
+  path: string;
+  /** Optional description shown in Studio selector */
+  description?: string;
+}
+
+/**
  * Scope configuration
  */
 export interface ScopeConfig {
-  /**
-   * Default scope to use when not specified via CLI flag
-   * Supports: package names (@kb-labs/core), wildcards (@kb-labs/*), path patterns (packages/**)
-   * @example "kb-labs-commit-plugin"
-   * @example "@kb-labs/*"
-   * @example "packages/core/**"
-   */
+  /** Default scope id to pre-select in Studio and use when not specified via CLI */
   default?: string;
+  /**
+   * Explicit list of available scopes.
+   * If not provided, falls back to a single "root" scope (workspace root).
+   *
+   * @example
+   * ```json
+   * "scopes": [
+   *   { "id": "root", "label": "workspace root", "path": "." },
+   *   { "id": "public/kb-labs", "label": "kb-labs (public)", "path": "public/kb-labs" }
+   * ]
+   * ```
+   */
+  scopes?: CommitScope[];
 }
 
 /**
@@ -127,7 +154,8 @@ export const defaultCommitConfig: CommitPluginConfig = {
     autoStage: false,
   },
   scope: {
-    default: undefined,
+    default: 'root',
+    scopes: [{ id: 'root', label: 'root', path: '.' }],
   },
 };
 
@@ -180,6 +208,7 @@ export function resolveCommitConfig(
     },
     scope: {
       default: fileConfig.scope?.default ?? defaultCommitConfig.scope?.default,
+      scopes: fileConfig.scope?.scopes ?? defaultCommitConfig.scope?.scopes,
     },
   };
 

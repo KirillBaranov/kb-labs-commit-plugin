@@ -1,5 +1,5 @@
-import { defineHandler, type PluginContextV3, type RestInput, useLogger } from '@kb-labs/sdk';
-import { type FileDiffResponse } from '@kb-labs/commit-contracts';
+import { defineHandler, useConfig, type PluginContextV3, type RestInput, useLogger } from '@kb-labs/sdk';
+import { type FileDiffResponse, type CommitPluginConfig, resolveCommitConfig } from '@kb-labs/commit-contracts';
 import { getFileDiff } from '@kb-labs/commit-core/analyzer';
 import { resolveScopePath } from './scope-resolver';
 import { readFile } from 'node:fs/promises';
@@ -24,7 +24,9 @@ export default defineHandler({
 
     try {
       // Resolve scope to actual directory path
-      const scopeCwd = resolveScopePath(ctx.cwd, scope);
+      const fileConfig = await useConfig<Partial<CommitPluginConfig>>();
+      const config = resolveCommitConfig(fileConfig ?? {});
+      const scopeCwd = resolveScopePath(ctx.cwd, scope, config.scope?.scopes);
       logger.info('[diff-handler] Resolved scope', { scope, scopeCwd });
 
       // Get file diff (git runs FROM scopeCwd)

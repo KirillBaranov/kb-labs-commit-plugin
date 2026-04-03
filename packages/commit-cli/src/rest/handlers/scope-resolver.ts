@@ -1,32 +1,22 @@
 import * as path from 'node:path';
-import * as fs from 'node:fs';
+import type { CommitScope } from '@kb-labs/commit-contracts';
 
 /**
- * Resolves scope to actual filesystem path.
+ * Resolves a scope id to an absolute filesystem path.
  *
- * Scope IDs are relative folder paths from workspace root (returned by scopes-handler).
- * This is a direct path join — no name-to-folder guessing.
+ * Looks up the scope in the provided scopes array by id.
+ * Falls back to treating the id as a relative path from baseCwd (legacy compat).
  *
- * @param baseCwd - Base directory (workspace root)
- * @param scope - Scope identifier: folder path like 'kb-labs-mind' or 'root'
- * @returns Resolved absolute path to the scope directory
- *
- * Examples:
- * - resolveScopePath('/kb-labs', 'root') → '/kb-labs'
- * - resolveScopePath('/kb-labs', 'kb-labs-mind') → '/kb-labs/kb-labs-mind'
- * - resolveScopePath('/kb-labs', 'nested/repo') → '/kb-labs/nested/repo'
+ * @param baseCwd  - Workspace root (ctx.cwd)
+ * @param scopeId  - Scope identifier, e.g. "root", "public/kb-labs"
+ * @param scopes   - Configured scopes from CommitPluginConfig.scope.scopes
  */
-export function resolveScopePath(baseCwd: string, scope: string = 'root'): string {
-  if (scope === 'root' || scope === '.') {
-    return baseCwd;
-  }
-
-  const resolved = path.join(baseCwd, scope);
-
-  // Validate the path exists
-  if (!fs.existsSync(resolved)) {
-    throw new Error(`Scope directory not found: ${resolved} (scope: "${scope}")`);
-  }
-
-  return resolved;
+export function resolveScopePath(
+  baseCwd: string,
+  scopeId: string = 'root',
+  scopes?: CommitScope[],
+): string {
+  const scopeDef = scopes?.find((s) => s.id === scopeId);
+  const relativePath = scopeDef?.path ?? (scopeId === 'root' ? '.' : scopeId);
+  return relativePath === '.' ? baseCwd : path.join(baseCwd, relativePath);
 }

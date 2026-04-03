@@ -72,11 +72,15 @@ export async function resolveScope(
   }
 
   // Path pattern: packages/core/** or src/**/*.ts
+  // If the scope is a plain directory path (no glob chars), append /** to match all files inside
+  const filePattern = !scope.includes("*") && !scope.includes("?")
+    ? `${scope}/**`
+    : scope;
   return {
     original: scope,
     type: "path-pattern",
     packagePaths: [],
-    filePattern: scope,
+    filePattern,
   };
 }
 

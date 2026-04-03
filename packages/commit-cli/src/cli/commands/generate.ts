@@ -28,6 +28,7 @@ import {
   type GenerateFlags,
   commitEnv,
 } from '@kb-labs/commit-contracts';
+import { resolveScopePath } from '../../rest/handlers/scope-resolver';
 
 // Input type with V3 handler compatibility
 // V3 handlers receive flags either in input.flags (CLI) or directly in input (REST API)
@@ -62,14 +63,15 @@ export default defineCommand({
 
       // V3: Flags come in input.flags (CLI) or directly in input (REST API)
       const flags = input.flags ?? input;
-      const effectiveScope = flags.scope ?? config.scope?.default;
+      const effectiveScope = flags.scope ?? config.scope?.default ?? 'root';
+      const scopeCwd = resolveScopePath(cwd, effectiveScope, config.scope?.scopes);
       const allowSecrets = flags['allow-secrets'] ?? false;
       const autoConfirm = flags.yes ?? false;
 
       // Check for changes (with scope for nested repos)
       const statusLoader = useLoader('Checking git status...');
       statusLoader.start();
-      const status = await getGitStatus(cwd, { scope: effectiveScope });
+      const status = await getGitStatus(scopeCwd);
 
       if (!hasChanges(status)) {
         statusLoader.stop();
@@ -101,8 +103,7 @@ export default defineCommand({
           : undefined;
 
       const plan = await generateCommitPlan({
-        cwd,
-        scope: effectiveScope,
+        cwd: scopeCwd,
         llmComplete,
         config,
         allowSecrets,

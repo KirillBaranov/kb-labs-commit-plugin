@@ -28,6 +28,7 @@ import {
   type CommitFlags,
   commitEnv,
 } from '@kb-labs/commit-contracts';
+import { resolveScopePath } from '../../rest/handlers/scope-resolver';
 
 // Input type with V3 handler compatibility
 // V3 handlers receive flags either in input.flags (CLI) or directly in input (REST API)
@@ -62,7 +63,8 @@ export default defineCommand({
 
       // V3: Flags come in input.flags (CLI) or directly in input (REST API)
       const flags = input.flags ?? input;
-      const effectiveScope = flags.scope ?? config.scope?.default;
+      const effectiveScope = flags.scope ?? config.scope?.default ?? 'root';
+      const scopeCwd = resolveScopePath(cwd, effectiveScope, config.scope?.scopes);
       const dryRun = flags['dry-run'] ?? false;
       const withPush = flags['with-push'] ?? false;
       const outputJson = flags.json ?? false;
@@ -72,7 +74,7 @@ export default defineCommand({
       // 1. Check for changes
       const statusLoader = useLoader('Checking git status...');
       statusLoader.start();
-      const status = await getGitStatus(cwd, { scope: effectiveScope });
+      const status = await getGitStatus(scopeCwd);
 
       if (!hasChanges(status)) {
         statusLoader.stop();
@@ -104,8 +106,7 @@ export default defineCommand({
           : undefined;
 
       const plan = await generateCommitPlan({
-        cwd,
-        scope: effectiveScope,
+        cwd: scopeCwd,
         llmComplete,
         config,
         allowSecrets,
@@ -173,7 +174,7 @@ export default defineCommand({
       // 3. Apply plan
       const applyLoader = useLoader('Applying commits...');
       applyLoader.start();
-      const applyResult = await applyCommitPlan(cwd, plan);
+      const applyResult = await applyCommitPlan(scopeCwd, plan);
 
       if (!applyResult.success) {
         applyLoader.fail('Failed to apply commits');
@@ -196,7 +197,7 @@ export default defineCommand({
       if (withPush) {
         const pushLoader = useLoader('Pushing commits...');
         pushLoader.start();
-        const pushResult = await pushCommits(cwd);
+        const pushResult = await pushCommits(scopeCwd);
 
         if (pushResult.success) {
           pushed = true;

@@ -11,7 +11,6 @@ import { COMMIT_PLAN_TOOL, COMMIT_PLAN_TOOL_PHASE3 } from './commit-tools';
 import { getGitStatus, getAllChangedFiles } from '../analyzer/git-status';
 import { getFileSummaries, getFileDiffs } from '../analyzer/file-summary';
 import { getRecentCommits } from '../analyzer/recent-commits';
-import { resolveScope, matchesScope, type ResolvedScope } from '../analyzer/scope-resolver';
 import {
   buildPromptWithDiff,
   buildEnhancedPrompt,
@@ -22,7 +21,6 @@ import {
 } from './llm-prompt';
 import { generateHeuristicPlan } from './heuristics';
 import { analyzePatterns, type PatternAnalysis } from './pattern-detector';
-import { minimatch } from 'minimatch';
 import {
   detectSecretFiles,
   detectSecretsWithLocation,
@@ -107,37 +105,16 @@ function toSafeCommitGroup(
  */
 // eslint-disable-next-line sonarjs/cognitive-complexity -- Main orchestrator: scope resolution, git status, file analysis, LLM phases (1 & 2), validation, retry logic, heuristics, anti-hallucination checks
 export async function generateCommitPlan(options: GenerateOptions): Promise<CommitPlan> {
-  const { cwd, scope, onProgress } = options;
+  const { cwd, onProgress } = options;
 
   const logger = useLogger();
   const analytics = useAnalytics();
   const llm = useLLM();
   const startTime = Date.now();
 
-  // 1. Resolve scope first if provided
-  // Supports: package names (@kb-labs/core), wildcards (@kb-labs/*), and path patterns (packages/**)
-  let resolvedScope: ResolvedScope | undefined;
-  let scopePathForGit: string | undefined;
-  if (scope) {
-    resolvedScope = await resolveScope(cwd, scope);
-
-    // If scope resolved to a single package path, use it for nested repo detection
-    if (resolvedScope.packagePaths.length === 1) {
-      scopePathForGit = resolvedScope.packagePaths[0];
-    } else {
-      // For wildcards or path patterns, use original scope
-      scopePathForGit = scope;
-    }
-  }
-
-  // 2. Get git status (with scope support for nested repos)
-  const gitStatus = await getGitStatus(cwd, { scope: scopePathForGit });
+  // 1. Get git status — cwd is already the resolved scope directory
+  const gitStatus = await getGitStatus(cwd);
   let allFiles = getAllChangedFiles(gitStatus);
-
-  // 3. Apply scope filter if provided
-  if (resolvedScope) {
-    allFiles = filterFilesByScope(allFiles, resolvedScope);
-  }
 
   if (allFiles.length === 0) {
     return createEmptyPlan(cwd, gitStatus);
@@ -456,7 +433,7 @@ export async function generateCommitPlan(options: GenerateOptions): Promise<Comm
     tokensUsed,
     durationMs: Date.now() - startTime,
     typeDistribution,
-    scope: scope || 'all',
+    cwd,
   });
 
   // 7. Build final plan
@@ -464,7 +441,7 @@ export async function generateCommitPlan(options: GenerateOptions): Promise<Comm
     schemaVersion: '1.0',
     createdAt: new Date().toISOString(),
     repoRoot: cwd,
-    gitStatus: filterGitStatusByScope(gitStatus, resolvedScope),
+    gitStatus,
     commits,
     metadata: {
       totalFiles: summaries.length,
@@ -494,34 +471,6 @@ function createEmptyPlan(cwd: string, gitStatus: GitStatus): CommitPlan {
   };
 }
 
-/**
- * Filter files by resolved scope
- * Supports package names, wildcards, and path patterns
- */
-function filterFilesByScope(files: string[], resolvedScope: ResolvedScope): string[] {
-  if (resolvedScope.type === 'path-pattern') {
-    // Use minimatch for path patterns
-    return files.filter((file) => minimatch(file, resolvedScope.original));
-  }
-
-  // For package names and wildcards, use matchesScope
-  return files.filter((file) => matchesScope(file, resolvedScope));
-}
-
-/**
- * Filter git status by resolved scope
- */
-function filterGitStatusByScope(status: GitStatus, resolvedScope?: ResolvedScope): GitStatus {
-  if (!resolvedScope) {return status;}
-
-  const filterFn = (files: string[]) => filterFilesByScope(files, resolvedScope);
-
-  return {
-    staged: filterFn(status.staged),
-    unstaged: filterFn(status.unstaged),
-    untracked: filterFn(status.untracked),
-  };
-}
 
 /**
  * Generate commits using native tools (chatWithTools) - Phase 1

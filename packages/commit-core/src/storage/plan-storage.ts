@@ -8,7 +8,6 @@ import { readFile, writeFile, mkdir, rm, readdir } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import type { CommitPlan, ApplyResult, GitStatusSnapshot } from '@kb-labs/commit-contracts';
 import { CommitPlanSchema, GitStatusSnapshotSchema } from '@kb-labs/commit-contracts';
-import { getGitStatus } from '../analyzer/git-status';
 import { getFileSummaries } from '../analyzer/file-summary';
 
 const COMMIT_DIR = '.kb/commit';
@@ -75,8 +74,8 @@ export async function savePlan(cwd: string, plan: CommitPlan, scope: string = 'r
   // Save plan
   await writeFile(planPath, JSON.stringify(plan, null, 2));
 
-  // Save status snapshot
-  const status = await getGitStatus(cwd, { scope });
+  // Save status snapshot — use git status already captured in the plan
+  const status = plan.gitStatus;
   const allFiles = [...status.staged, ...status.unstaged, ...status.untracked];
   const summaries = await getFileSummaries(cwd, allFiles);
 

@@ -3,20 +3,7 @@
  */
 
 import { useState } from 'react';
-import { useData, useMutateData, useNotification, useTheme } from '@kb-labs/sdk/studio';
-import {
-  UICard,
-  UIButton,
-  UIEmptyState,
-  UISkeleton,
-  UIAlert,
-  UITag,
-  UIBadge,
-  UIIcon,
-  UISpin,
-  UITypographyText,
-  UIDiffViewer,
-} from '@kb-labs/studio-ui-kit';
+import { useData, useMutateData, useNotification, useTheme, UICard, UIButton, UIEmptyState, UISkeleton, UIAlert, UITag, UIBadge, UIIcon, UITypographyText, UIDiffViewer } from '@kb-labs/sdk/studio';
 
 const Text = UITypographyText;
 
@@ -58,8 +45,8 @@ export function CommitFilesTab({ scope }: CommitFilesTabProps) {
   );
 
   // Guards
-  if (!scope) return <UIEmptyState description="Select a scope to continue" />;
-  if (isLoading) return <UICard><UISkeleton active lines={5} /></UICard>;
+  if (!scope) {return <UIEmptyState description="Select a scope to continue" />;}
+  if (isLoading) {return <UICard><UISkeleton active lines={5} /></UICard>;}
 
   const rawFiles = gitStatus?.rows ?? gitStatus?.summaries ?? [];
   const files: FileEntry[] = rawFiles
@@ -89,7 +76,7 @@ export function CommitFilesTab({ scope }: CommitFilesTabProps) {
 
   const toggle = <T,>(set: Set<T>, item: T) => {
     const next = new Set(set);
-    next.has(item) ? next.delete(item) : next.add(item);
+    if (next.has(item)) { next.delete(item); } else { next.add(item); }
     return next;
   };
 
@@ -224,8 +211,8 @@ function FileDiff({ scope, file, status }: { scope: string; file: string; status
     '/v1/plugins/commit/diff', { params: { scope, file }, enabled: !!scope && !!file },
   );
 
-  if (isLoading) return <div style={{ padding: 16 }}><UISkeleton active lines={8} /></div>;
-  if (!diffData?.diff) return <div style={{ padding: 16 }}><Text type="secondary">No changes to display</Text></div>;
+  if (isLoading) {return <div style={{ padding: 16 }}><UISkeleton active lines={8} /></div>;}
+  if (!diffData?.diff) {return <div style={{ padding: 16 }}><Text type="secondary">No changes to display</Text></div>;}
 
   const isNew = status === 'untracked' || status === 'added';
 

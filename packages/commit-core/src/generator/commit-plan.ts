@@ -114,7 +114,7 @@ export async function generateCommitPlan(options: GenerateOptions): Promise<Comm
 
   // 1. Get git status — cwd is already the resolved scope directory
   const gitStatus = await getGitStatus(cwd);
-  let allFiles = getAllChangedFiles(gitStatus);
+  const allFiles = getAllChangedFiles(gitStatus);
 
   if (allFiles.length === 0) {
     return createEmptyPlan(cwd, gitStatus);

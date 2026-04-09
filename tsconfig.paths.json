@@ -21,35 +21,11 @@
       "@kb-labs/sdk/*": [
         "../../platform/kb-labs-sdk/packages/sdk/src/*"
       ],
-      "@kb-labs/studio-event-bus": [
-        "../../platform/kb-labs-studio/packages/studio-event-bus/src/index.ts"
-      ],
-      "@kb-labs/studio-event-bus/*": [
-        "../../platform/kb-labs-studio/packages/studio-event-bus/src/*"
-      ],
-      "@kb-labs/studio-hooks": [
-        "../../platform/kb-labs-studio/packages/studio-hooks/src/index.ts"
-      ],
-      "@kb-labs/studio-hooks/*": [
-        "../../platform/kb-labs-studio/packages/studio-hooks/src/*"
-      ],
       "@kb-labs/studio-plugin-tools": [
         "../../platform/kb-labs-studio/packages/studio-plugin-tools/src/index.ts"
       ],
       "@kb-labs/studio-plugin-tools/*": [
         "../../platform/kb-labs-studio/packages/studio-plugin-tools/src/*"
-      ],
-      "@kb-labs/studio-ui-core": [
-        "../../platform/kb-labs-studio/packages/studio-ui-core/src/index.ts"
-      ],
-      "@kb-labs/studio-ui-core/*": [
-        "../../platform/kb-labs-studio/packages/studio-ui-core/src/*"
-      ],
-      "@kb-labs/studio-ui-kit": [
-        "../../platform/kb-labs-studio/packages/studio-ui-kit/src/index.ts"
-      ],
-      "@kb-labs/studio-ui-kit/*": [
-        "../../platform/kb-labs-studio/packages/studio-ui-kit/src/*"
       ]
     }
   }
